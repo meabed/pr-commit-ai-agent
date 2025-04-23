@@ -1,0 +1,17 @@
+{
+  "github": {
+    "token": "<YOUR_GITHUB_TOKEN>",
+    "owner": "<YOUR_GITHUB_USERNAME>",
+    "repo": "<YOUR_REPOSITORY_NAME>",
+    "baseBranch": "main"
+  },
+  "llm": {
+    "provider": "openai",
+    "apiKey": "<YOUR_OPENAI_API_KEY>",
+    "model": "gpt-4o-mini"
+  },
+  "git": {
+    "authorName": "<YOUR_GIT_NAME>",
+    "authorEmail": "<YOUR_GIT_EMAIL>"
+  }
+}
