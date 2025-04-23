@@ -18,7 +18,7 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 })
 
-export default defineConfig([
+const configAll = defineConfig([
   globalIgnores([
     '**/logs',
     '**/*.log',
@@ -118,3 +118,5 @@ export default defineConfig([
     },
   },
 ])
+
+export default configAll

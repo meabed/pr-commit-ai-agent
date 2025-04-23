@@ -29,49 +29,6 @@ Before you begin, ensure you have installed [Node.js](https://nodejs.org/) and [
 
 ## Getting Started
 
-To start using this CLI TypeScript starter, follow these steps:
-
-### 1. Make a new project
-
-```sh
-npx cli-typescript-starter create my-project
-```
-
-or
-
-```sh
-npx giget@latest gh:kucherenko/cli-typescript-starter my-project
-```
-
-or
-
-```sh
-pnpm exec degit kucherenko/cli-typescript-starter my-project
-```
-
-### 2. Install dependencies
-
-Navigate to your project directory and install the necessary dependencies:
-
-```sh
-cd my-project && pnpm install
-```
-
-### 3. Configure the package
-
-Update the `package.json` to reflect your project's details:
-
-- Rename the package:
-  ```json
-  "name": "my-project",
-  ```
-- Set the command name:
-  ```json
-  "bin": {
-    "my-project": "./bin/run"
-  }
-  ```
-
 ### 4. Set up environment variables
 
 Create a `.env` file in the root directory and configure your environment variables as needed.
@@ -120,7 +77,7 @@ This starter comes with several predefined scripts to help with development:
 
 ## CI/CD and Automation
 
-### Automated Version Management and NPM Publishing with Semantic-Release
+[### Automated Version Management and NPM Publishing with Semantic-Release
 
 This project utilizes `semantic-release` to automate version management and the NPM publishing
 process. `Semantic-release` automates the workflow of releasing new versions, including the generation of detailed
@@ -133,7 +90,7 @@ The publishing process is triggered automatically when changes are merged into t
 2. **Release Notes:** It then generates comprehensive release notes detailing new features, bug fixes, and any breaking
    changes, enhancing clarity and communication with users.
 3. **NPM Publishing:** Finally, `semantic-release` publishes the new version to the NPM registry and creates a GitHub
-   release with the generated notes.
+]()   release with the generated notes.
 
 To ensure a smooth `semantic-release` process:
 
@@ -182,13 +139,3 @@ others to contribute and for users to understand and utilize the project effecti
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-## Author
-
-**Andrey Kucherenko**
-
-- GitHub: [@kucherenko](https://github.com/kucherenko)
-
----
-
-Happy Coding!
