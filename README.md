@@ -90,7 +90,7 @@ The publishing process is triggered automatically when changes are merged into t
 2. **Release Notes:** It then generates comprehensive release notes detailing new features, bug fixes, and any breaking
    changes, enhancing clarity and communication with users.
 3. **NPM Publishing:** Finally, `semantic-release` publishes the new version to the NPM registry and creates a GitHub
-]()   release with the generated notes.
+   ]() release with the generated notes.
 
 To ensure a smooth `semantic-release` process:
 
