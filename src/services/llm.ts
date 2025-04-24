@@ -42,7 +42,7 @@ let anthropicClient: Anthropic | null = null
 const logDir = path.join(os.homedir(), '.llm-logs')
 
 // Initialize clients based on config
-const initializeClients = () => {
+function initializeClients() {
   try {
     if (config.openai?.apiKey) {
       openaiClient = new OpenAI({
@@ -62,7 +62,7 @@ const initializeClients = () => {
 }
 
 // Ensure log directory exists
-const ensureLogDirectory = async (): Promise<void> => {
+async function ensureLogDirectory() {
   try {
     await fs.mkdir(logDir, { recursive: true })
   } catch (error) {
@@ -71,7 +71,7 @@ const ensureLogDirectory = async (): Promise<void> => {
 }
 
 // Log request to file
-const logRequest = async (logEntry: LLMLogEntry): Promise<string> => {
+async function logRequest(logEntry: LLMLogEntry) {
   try {
     const logFileName = `llm-requests-${new Date().toISOString().split('T')[0]}.jsonl`
     const logFilePath = path.join(logDir, logFileName)
