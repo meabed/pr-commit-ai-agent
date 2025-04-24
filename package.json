@@ -57,7 +57,7 @@
     "dotenv": "^16.5.0",
     "giget": "^2.0.0",
     "ollama-ai-provider": "^1.2.0",
-    "openai": "^4.95.1",
+    "openai": "^4.96.0",
     "picocolors": "^1.1.1",
     "simple-git": "^3.27.0",
     "uuid": "^11.1.0",
