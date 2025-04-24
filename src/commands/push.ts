@@ -2,7 +2,6 @@ import * as process from 'node:process'
 import { logger } from '../logger'
 import { green, red, yellow } from 'picocolors'
 import { simpleGit, SimpleGit, StatusResult } from 'simple-git'
-import * as console from 'node:console'
 import { generateCompletion } from '../services/llm'
 
 export const command = 'push'
@@ -227,7 +226,6 @@ and the following structure:
       process.exit(0)
     }
   } catch (e) {
-    console.log('res', res, 'e', e)
     logger.debug('Raw response:', res)
     logger.error(red('Failed to parse LLM response as JSON'))
     throw new Error('Invalid LLM response format')
