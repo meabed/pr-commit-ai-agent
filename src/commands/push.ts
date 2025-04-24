@@ -191,8 +191,6 @@ and the following structure:
 `
   logger.info(green('Sending changes to LLM for commit suggestion...'))
   const res = await generateCompletion('ollama', {
-    logRequest: true,
-    temperature: 0.1,
     prompt: `${systemPrompt}${tempModified.join('')}`,
   })
 
@@ -261,6 +259,16 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
 
   // Process commits in reverse order (oldest first)
   for (const commit of [...commits.all].reverse()) {
+    // Check if this is a merge commit (has multiple parents)
+    const revList = await git.raw(['rev-list', '--parents', '-n', '1', commit.hash])
+    const parentHashes = revList.trim().split(' ')
+
+    // If there are more than 2 entries (commit hash + parent hashes), it's a merge commit
+    if (parentHashes.length > 2) {
+      logger.info(yellow(`Skipping merge commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
+      continue
+    }
+
     // Get commit diff
     logger.info(yellow(`Analyzing commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
     const diff = await git.show([commit.hash])
@@ -300,7 +308,6 @@ ${diff}
     logger.info(yellow(`Requesting improved commit message from AI...`))
 
     const res = await generateCompletion('ollama', {
-      temperature: 0.1,
       prompt: `${systemPrompt}${promptMsg}`,
     })
 
@@ -327,8 +334,8 @@ ${diff}
           '--fixup=' + commit.hash,
         ])
 
-        logger.info(yellow('Running interactive rebase to apply changes...'))
-        await git.raw(['rebase', '--interactive', '--autosquash', `${commit.hash}~1`])
+        logger.info(yellow('Running non-interactive rebase to apply changes...'))
+        await git.raw(['rebase', '--no-interaction', '--preserve-merges', '--autosquash', `${commit.hash}~1`])
         logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
       } else {
         logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
@@ -384,7 +391,6 @@ Commit message: ${commitMessage}
 `
 
   const res = await generateCompletion('ollama', {
-    temperature: 0.1,
     prompt: `${systemPrompt}${prPrompt}`,
   })
 
