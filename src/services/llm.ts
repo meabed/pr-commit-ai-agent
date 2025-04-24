@@ -296,7 +296,7 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
     options: {
       temperature: options.temperature || 0.1, // I don't want entropy injected into my code
       num_ctx: 32768, // More useful default
-      num_batch: 1024, // Faster, but more vRAM
+      // num_batch: 1024, // Faster, but more vRAM
       top_p: 0.8, // Quality
     } as OllamaGenerateOptions,
   })
