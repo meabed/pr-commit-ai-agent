@@ -233,33 +233,64 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
   return data.choices[0]?.message?.content || ''
 }
 
+/**
+ * Configuration options for Ollama model generation requests.
+ * These parameters control various aspects of the text generation process.
+ */
 type OllamaGenerateOptions = {
+  /** Number of tokens to keep from the prompt */
   num_keep?: number
+  /** Random seed for deterministic generation */
   seed?: number
+  /** Maximum number of tokens to predict */
   num_predict?: number
+  /** Limits the next token selection to the K most probable tokens */
   top_k?: number
+  /** Limits the next token selection to a subset of tokens with a cumulative probability above a threshold P */
   top_p?: number
+  /** Sets a minimum probability threshold for token selection */
   min_p?: number
+  /** Controls the diversity of generated text by sampling from more probable tokens */
   typical_p?: number
+  /** Number of previous tokens to consider for repetition penalty */
   repeat_last_n?: number
+  /** Sampling temperature, higher values make output more random, lower more deterministic (0-1) */
   temperature?: number
+  /** Penalty for repeating tokens, higher values discourage repetition */
   repeat_penalty?: number
+  /** Penalty for tokens that appear in the prompt, higher values discourage them */
   presence_penalty?: number
+  /** Penalty based on token's frequency in the generated text so far */
   frequency_penalty?: number
+  /** Enables Mirostat sampling algorithm (0, 1, or 2) */
   mirostat?: number
+  /** Mirostat target entropy parameter */
   mirostat_tau?: number
+  /** Mirostat learning rate parameter */
   mirostat_eta?: number
+  /** Whether to apply penalties to newline tokens */
   penalize_newline?: boolean
+  /** Sequences that will cause the model to stop generating further tokens */
   stop?: string[]
+  /** Whether to use NUMA optimization when available */
   numa?: boolean
+  /** Size of context window in tokens */
   num_ctx?: number
+  /** Batch size for token processing */
   num_batch?: number
+  /** Number of GPUs to use for computation */
   num_gpu?: number
+  /** Main GPU to use for computation in multi-GPU setup */
   main_gpu?: number
+  /** Optimize for low VRAM usage at the cost of performance */
   low_vram?: boolean
+  /** Only load the vocabulary, not the weights */
   vocab_only?: boolean
+  /** Use memory mapping for the model weights */
   use_mmap?: boolean
+  /** Force the system to keep the model in RAM */
   use_mlock?: boolean
+  /** Number of CPU threads to use */
   num_thread?: number
 }
 
