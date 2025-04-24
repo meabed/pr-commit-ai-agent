@@ -285,16 +285,20 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     const systemPrompt = `
 ${getSystemPrompt()}
 
-Provide a better commit message that clearly describes the change using the conventional commit format 
+First, analyze the commit message and determine if it needs improvement based on conventional commit best practices.
+Then, if it needs improvement, provide a better commit message that clearly describes the change using the conventional commit format 
 (type(scope): description). Types include: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
 The message should be concise, clear, and follow best practices.
 
-Format your response as a JSON object with the following length structure:
-- improvedCommitMessage: max 120 characters
-and the following structure:
+Format your response as a JSON object with the following structure:
 {
+  "needsImprovement": true|false,
+  "reason": "Brief explanation of why the commit needs improvement or why it's already sufficient",
   "improvedCommitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
-}`
+}
+
+The "improvedCommitMessage" should only be provided if "needsImprovement" is true, and should be max 120 characters.
+`
     // Ask LLM for a better commit message
     const promptMsg = `
 
@@ -305,40 +309,58 @@ ${diff}
 
 }
 `
-    logger.info(yellow(`Requesting improved commit message from AI...`))
+    logger.info(yellow(`Requesting commit message analysis from AI...`))
 
     const res = await generateCompletion('ollama', {
       prompt: `${systemPrompt}${promptMsg}`,
     })
 
     try {
-      const optimizedCommit = JSON.parse(res.text)
-      logger.box({
-        title: `Original: ${commit.message}`,
-        content: `Improved: ${optimizedCommit.improvedCommitMessage}`,
-      })
+      const analysis = JSON.parse(res.text)
 
-      const amendConfirm = await logger.prompt(green('Use this improved commit message?'), {
-        type: 'confirm',
-      })
+      if (analysis.needsImprovement) {
+        logger.box({
+          title: `Analysis: Commit needs improvement`,
+          content: `Reason: ${analysis.reason}\n\nOriginal: ${commit.message}\nImproved: ${analysis.improvedCommitMessage}`,
+        })
 
-      if (amendConfirm) {
-        logger.info(yellow(`Amending commit ${commit.hash.substring(0, 7)}...`))
-        // Amend the commit message
-        await git.raw([
-          'commit',
-          '--amend',
-          '-m',
-          optimizedCommit.improvedCommitMessage,
-          '--no-edit',
-          '--fixup=' + commit.hash,
-        ])
+        const amendConfirm = await logger.prompt(green('Use this improved commit message?'), {
+          type: 'confirm',
+        })
 
-        logger.info(yellow('Running non-interactive rebase to apply changes...'))
-        await git.raw(['rebase', '--no-interaction', '--preserve-merges', '--autosquash', `${commit.hash}~1`])
-        logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
+        if (amendConfirm) {
+          logger.info(yellow(`Amending commit ${commit.hash.substring(0, 7)}...`))
+
+          // Create a temporary fixup commit
+          await git.raw(['commit', '--fixup=' + commit.hash, '--allow-empty', '-m', analysis.improvedCommitMessage])
+
+          // Run non-interactive rebase to apply the fixup
+          logger.info(yellow('Running non-interactive rebase to apply changes...'))
+          await git
+            .raw([
+              'rebase',
+              '--interactive',
+              '--exec',
+              `if [ "$(git rev-parse --short HEAD)" = "${commit.hash.substring(0, 7)}" ]; then git commit --amend --no-edit -m "${analysis.improvedCommitMessage.replace(/"/g, '\\"')}"; fi`,
+              `${commit.hash}~1`,
+            ])
+            .catch(async (error) => {
+              logger.error(red(`Rebase failed: ${error.message}`))
+              logger.info(yellow('Attempting to abort rebase...'))
+              await git.rebase(['--abort'])
+              throw error
+            })
+
+          logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
+        } else {
+          logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
+        }
       } else {
-        logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
+        logger.box({
+          title: `Analysis: Commit is sufficient`,
+          content: `Reason: ${analysis.reason}\n\nCurrent message: ${commit.message}`,
+        })
+        logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}`))
       }
     } catch (e) {
       logger.error(red(`Failed to optimize commit ${commit.hash.substring(0, 7)}`))
