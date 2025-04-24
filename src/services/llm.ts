@@ -8,7 +8,6 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { v4 as uuidv4 } from 'uuid'
-import * as console from 'node:console'
 import { getSystemPrompt } from './prompts'
 
 // Define supported LLM providers
@@ -297,7 +296,6 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
   const data = (await response.json()) as unknown as {
     response: string
   }
-  console.log('data', data)
   return data?.response || ''
 }
 
