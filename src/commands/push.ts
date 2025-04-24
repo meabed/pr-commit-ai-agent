@@ -267,15 +267,15 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     // ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis ':!some/path' ':!some/other/path'
     const diff = await git.show([
       commit.hash,
-      ...ignoredFiles.map((file) => `:!${file}`),
-      ':!*.generated.*',
-      ':!*.lock',
-      ':!tsconfig.json',
-      ':!tsconfig.*.json',
-      ':!*.svg',
-      ':!*.png',
-      ':!*.jpg',
-      ':!*.jpeg',
+      ...ignoredFiles.map((file) => `:(exclude)${file}`),
+      ':(exclude)*.generated.*',
+      ':(exclude)*.lock',
+      ':(exclude)tsconfig.json',
+      ':(exclude)tsconfig.*.json',
+      ':(exclude)*.svg',
+      ':(exclude)*.png',
+      ':(exclude)*.jpg',
+      ':(exclude)*.jpeg',
     ])
 
     const systemPrompt = `
