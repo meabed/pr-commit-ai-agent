@@ -84,7 +84,6 @@ async function getUpstreamBranch(git: SimpleGit): Promise<string> {
 
     // Try to get the tracking branch directly
     const branchInfo = await git.branch()
-    // tracking branch  // git rev-parse --abbrev-ref --symbolic-full-name @{u}
     const trackingBranch = await git.revparse(['--abbrev-ref', '--symbolic-full-name', '@{u}']).catch(() => {
       logger.info(yellow('No tracking branch found'))
       return null
@@ -189,6 +188,7 @@ and the following structure:
   "commitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
 }
 `
+
   logger.info(green('Sending changes to LLM for commit suggestion...'))
   const res = await generateCompletion('ollama', {
     prompt: `${systemPrompt}${tempModified.join('')}`,
@@ -299,18 +299,16 @@ Format your response as a JSON object with the following structure:
 
 The "improvedCommitMessage" should only be provided if "needsImprovement" is true, and should be max 120 characters.
 `
+
     // Ask LLM for a better commit message
     const promptMsg = `
-
 Current commit message: "${commit.message}"
 
 Commit diff:
 ${diff}
-
-}
 `
-    logger.info(yellow(`Requesting commit message analysis from AI...`))
 
+    logger.info(yellow(`Requesting commit message analysis from AI...`))
     const res = await generateCompletion('ollama', {
       prompt: `${systemPrompt}${promptMsg}`,
     })
@@ -331,25 +329,21 @@ ${diff}
         if (amendConfirm) {
           logger.info(yellow(`Amending commit ${commit.hash.substring(0, 7)}...`))
 
-          // Create a temporary fixup commit
-          await git.raw(['commit', '--fixup=' + commit.hash, '--allow-empty', '-m', analysis.improvedCommitMessage])
+          // Store the current branch and commit
+          const currentBranch = (await git.branch()).current
+          const currentHead = await git.revparse(['HEAD'])
 
-          // Run non-interactive rebase to apply the fixup
-          logger.info(yellow('Running non-interactive rebase to apply changes...'))
-          await git
-            .raw([
-              'rebase',
-              '--interactive',
-              '--exec',
-              `if [ "$(git rev-parse --short HEAD)" = "${commit.hash.substring(0, 7)}" ]; then git commit --amend --no-edit -m "${analysis.improvedCommitMessage.replace(/"/g, '\\"')}"; fi`,
-              `${commit.hash}~1`,
-            ])
-            .catch(async (error) => {
-              logger.error(red(`Rebase failed: ${error.message}`))
-              logger.info(yellow('Attempting to abort rebase...'))
-              await git.rebase(['--abort'])
-              throw error
-            })
+          // Reset to the parent of the commit to amend
+          await git.raw(['reset', '--soft', `${commit.hash}^`])
+
+          // Re-commit the changes with the new message
+          await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+
+          // Move the branch pointer to the new commit
+          await git.raw(['branch', '-f', currentBranch, 'HEAD'])
+
+          // Reset to the current HEAD to continue processing
+          await git.raw(['reset', '--hard', currentHead])
 
           logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
         } else {
@@ -409,7 +403,6 @@ and the following structure:
 Based on this commit message, suggest a branch name, PR title and description for a pull request:
 
 Commit message: ${commitMessage}
-
 `
 
   const res = await generateCompletion('ollama', {
@@ -539,11 +532,11 @@ and the following structure:
 {
   "suggestedBranchName": "feature/your-feature-name", 
   "commitMessage": "type(scope): Summary of changes nDetailed explanation of changes...",
-  "prTitle": "type(scope): PR Title", # max 100 characters
+  "prTitle": "type(scope): PR Title",
   "prDescription": "## Summary [Comprehensive description with all sections outlined above]"
 }
+`
 
-  `
   const userPrompt = `
 PLEASE ANALYZE THE FOLLOWING GIT DIFF AND GENERATE A RESPONSE AS REQUESTED.
 Diff Changes: ${diffChanges}
