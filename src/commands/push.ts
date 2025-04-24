@@ -77,6 +77,7 @@ export async function handler() {
     }
   }
 }
+const ignoredFiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json']
 
 async function getUpstreamBranch(git: SimpleGit): Promise<string> {
   try {
@@ -150,7 +151,7 @@ async function handleUncommittedChanges(git: SimpleGit, status: StatusResult) {
 
   const modifiedFiles =
     status.modified?.filter((e) => {
-      return !['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json'].includes(e)
+      return !ignoredFiles.includes(e)
     }) || []
 
   const tempModified = [] as string[]
@@ -263,7 +264,19 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
 
     // Get commit diff
     logger.info(yellow(`Analyzing commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
-    const diff = await git.show([commit.hash])
+    // ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis ':!some/path' ':!some/other/path'
+    const diff = await git.show([
+      commit.hash,
+      ...ignoredFiles.map((file) => `:!${file}`),
+      ':!*.generated.*',
+      ':!*.lock',
+      ':!tsconfig.json',
+      ':!tsconfig.*.json',
+      ':!*.svg',
+      ':!*.png',
+      ':!*.jpg',
+      ':!*.jpeg',
+    ])
 
     const systemPrompt = `
 ${getSystemPrompt()}
