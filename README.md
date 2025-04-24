@@ -1,27 +1,7 @@
-# CLI TypeScript Starter
+# GitHub PR and Commit AI Agent
 
-An all-inclusive starter kit for crafting command-line interfaces (CLI) using TypeScript, driven by Node.js. This kit is
-meticulously designed to kick-start your development journey with a solid foundation, encompassing features such as
-argument parsing, environment setup, logging, testing suites, as well as code formatting and linting capabilities.
 
 ## Features
-
-This template incorporates several key tools and libraries to enhance your CLI development experience:
-
-- **[Yargs](https://github.com/yargs/yargs):** A powerful library for parsing command-line arguments.
-- **[Dotenv](https://github.com/motdotla/dotenv):** Loads environment variables from a `.env` file into `process.env`,
-  making it easy to manage application configuration.
-- **[PicoColors](https://github.com/alexeyraspopov/picocolors):** Lightweight and fast library for styling terminal
-  text.
-- **[Consola](https://github.com/unjs/consola):** 🐨Elegant Console Logger for Node.js and Browser
-- **[Jest](https://jestjs.io/):** A delightful JavaScript Testing Framework with a focus on simplicity.
-- **[TS-Node](https://typestrong.org/ts-node/):** TypeScript execution and REPL for Node.js.
-- **[TSUP](https://tsup.egoist.dev/):** The simplest and fastest way to bundle your TypeScript libraries.
-- **[Prettier](https://prettier.io/):** An opinionated code formatter that supports many languages and integrates with
-  most editors.
-- **[ESLint](https://eslint.org/):** A pluggable and configurable linter tool for identifying and reporting on patterns
-  in JavaScript and TypeScript.
-- **[giget](https://github.com/unjs/giget)** ✨ Download templates and git repositories with pleasure!
 
 ## Prerequisites
 
