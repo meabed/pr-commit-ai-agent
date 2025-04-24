@@ -78,6 +78,8 @@ export async function handler() {
   }
 }
 const ignoredFiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json']
+const PR_AGENT_NOTE_NAMESPACE = 'pr-agent'
+const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent'
 
 async function getUpstreamBranch(git: SimpleGit): Promise<string> {
   try {
@@ -218,7 +220,13 @@ and the following structure:
       await git.add('.')
 
       logger.info(yellow('Creating commit with the suggested message...'))
-      await git.commit(commitData.commitMessage)
+      const commitResult = await git.commit(commitData.commitMessage)
+
+      // Mark this commit as created by pr-agent using git notes
+      if (commitResult.commit) {
+        await markCommitAsCreatedByTool(git, commitResult.commit)
+      }
+
       logger.success(green('Changes committed successfully!'))
     } else {
       logger.info(yellow('Commit cancelled'))
@@ -231,6 +239,33 @@ and the following structure:
   }
 
   return commitData
+}
+
+/**
+ * Marks a commit as created by the PR Agent tool using git notes
+ */
+async function markCommitAsCreatedByTool(git: SimpleGit, commitHash: string) {
+  try {
+    logger.debug(`Marking commit ${commitHash} as created by PR Agent`)
+    await git.raw(['notes', '--ref', PR_AGENT_NOTE_NAMESPACE, 'add', '-m', PR_AGENT_NOTE_MESSAGE, commitHash])
+    logger.debug(`Successfully marked commit ${commitHash}`)
+  } catch (error) {
+    // Don't fail the whole process if we can't add notes
+    logger.debug(`Failed to mark commit with git notes: ${(error as Error).message}`)
+  }
+}
+
+/**
+ * Checks if a commit was created by the PR Agent tool
+ */
+async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promise<boolean> {
+  try {
+    const notes = await git.raw(['notes', '--ref', PR_AGENT_NOTE_NAMESPACE, 'show', commitHash]).catch(() => '')
+    return notes.includes(PR_AGENT_NOTE_MESSAGE)
+  } catch (error) {
+    logger.debug(`Failed to check git notes: ${(error as Error).message}`)
+    return false
+  }
 }
 
 async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
@@ -259,6 +294,13 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     // If there are more than 2 entries (commit hash + parent hashes), it's a merge commit
     if (parentHashes.length > 2) {
       logger.info(yellow(`Skipping merge commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
+      continue
+    }
+
+    // Check if the commit was created by this tool in the current session
+    const isToolCommit = await isCommitCreatedByTool(git, commit.hash)
+    if (isToolCommit) {
+      logger.info(yellow(`Skipping commit created by PR Agent: ${commit.hash.substring(0, 7)} - ${commit.message}`))
       continue
     }
 
@@ -319,7 +361,12 @@ ${diff}
         await git.raw(['reset', '--soft', `${commit.hash}^`])
 
         // Re-commit the changes with the new message
-        await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+        const newCommit = await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+
+        // Mark the new commit as created by our tool
+        if (newCommit.commit) {
+          await markCommitAsCreatedByTool(git, newCommit.commit)
+        }
 
         logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
       } else {
