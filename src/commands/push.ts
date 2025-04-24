@@ -150,7 +150,7 @@ async function handleUncommittedChanges(git: SimpleGit, status: StatusResult) {
 
   const modifiedFiles =
     status.modified?.filter((e) => {
-      return !['pnpm-lock.yaml', 'package-lock.json', 'tsconfig.json'].includes(e)
+      return !['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json'].includes(e)
     }) || []
 
   const tempModified = [] as string[]
@@ -496,6 +496,8 @@ and the following structure:
   const userPrompt = `
 PLEASE ANALYZE THE FOLLOWING GIT DIFF AND GENERATE A RESPONSE AS REQUESTED.
 Diff Changes: ${diffChanges}
+
+// Ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis.
 `
   return `${systemPrompt}${userPrompt}`
 }

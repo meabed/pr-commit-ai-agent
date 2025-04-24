@@ -101,5 +101,7 @@ Based on file patterns and code change patterns, classify the change appropriate
   * Replace conditional with polymorphism
   * Introduce design pattern
 
+## 8. Ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis.
+
 `
 }
