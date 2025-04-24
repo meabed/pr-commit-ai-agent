@@ -1,8 +1,9 @@
 import * as process from 'node:process'
 import { logger } from '../logger'
-import { green, red } from 'picocolors'
-import { simpleGit, SimpleGit } from 'simple-git'
-import { LLMService } from '../services/llm'
+import { green, red, yellow } from 'picocolors'
+import { simpleGit, SimpleGit, StatusResult } from 'simple-git'
+import * as console from 'node:console'
+import { generateCompletion } from '../services/llm'
 
 export const command = 'push'
 export const describe = 'Create PR and push to remote'
@@ -21,176 +22,509 @@ export async function handler() {
         maxConcurrentProcesses: 6,
       })
       const status = await git.status()
-      // find the upstream branch that is being tracked or this branched off of
-      // get all changes that are not committed or diff from the upstream branch
-      // const changes = await git.diffSummary(['HEAD', 'origin/master'])
-      const modifiedFiles = status.modified?.filter((e) => {
-        return !['pnpm-lock.yaml', 'package-lock.json', 'tsconfig.json'].includes(e)
-      })
-      const tempModified = [] as string[]
-      for (const file of modifiedFiles) {
-        const diff = await git.diff([file])
-        tempModified.push(`
-filename: ${file}
-diff changes: ${diff}
-____________=========================____________
-`)
-      }
 
-      // const excludePaths = [':(exclude)pnpm-lock.yaml']
-      // const changeString = await git.diff(['--word-diff=porcelain', 'HEAD', 'origin/master', 'src', ...excludePaths])
-      // ignore pnpm_lock.yaml and package-lock.json
-      // const changes = await git.diffSummary(['HEAD', 'origin/master'], {
-      // get all changes in template string format filename new line diff separator
-      // const changesString = changes.files
-      //   .map((file) => {
-      //     return `
-      //     filename: ${file.file}
-      //     diff changes: ${file.changes}`
-      //   })
-      //   .join('\n ------------------------------ \n')
-      // logger.log(green(`Changes:`), changeString)
-      const llmService = new LLMService()
-      const promptMsg = `
-You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
-
-## 1. Commit Message
-Create a well-structured commit message following conventional commit format:
-- First line (50-72 characters): Clear, concise summary using imperative mood (e.g., "Fix", "Add", "Update", not "Fixed", "Added", "Updated")
-- Type prefix according to conventional commits (feat, fix, docs, style, refactor, perf, test, build, ci, chore)
-- Blank line after summary
-- Detailed explanation of changes, their rationale, and impact (bullet points preferred)
-- Reference any relevant issue/ticket numbers with appropriate keywords (Fixes #123, Closes #456, Relates to #789)
-
-## 2. Pull Request Title
-- Create a clear, descriptive PR title (60-100 characters)
-- Begin with appropriate type prefix (same as commit convention)
-- Focus on the main purpose of the changes
-- Include scope if applicable (e.g., "feat(auth): Implement OAuth2 authentication flow")
-
-## 3. Pull Request Description
-Generate a comprehensive PR description including:
-- Summary section explaining the overall purpose and context
-- Problem statement: What issue is being solved?
-- Solution details: How the code changes address the problem
-- Technical implementation details:
-  * Architecture changes
-  * New dependencies introduced
-  * Database schema changes
-  * API changes (new endpoints, modified parameters, etc.)
-  * UI changes with description of user experience impacts
-- Potential risks and mitigations
-- Testing approach: How the changes were tested
-- Migration instructions if applicable (e.g., database migrations, config changes)
-- Screenshots/GIFs if UI changes are included (indicate where they would be placed)
-- Documentation updates required
-
-## 4. Analysis Guidelines
-- Identify change patterns (e.g., consistent variable renaming across files suggests intentional refactoring)
-- Recognize code smells or potential bugs in the changes
-- Consider edge cases that might not be handled
-- Evaluate test coverage of the changes
-- Assess performance implications
-- Identify security considerations
-- Note any architectural pattern changes
-- Check for appropriate error handling
-
-## 5. Classification Rules
-Based on file patterns and code change patterns, classify the change appropriately:
-
-- Bug fix: Contains changes that correct incorrect behavior
-  * Keywords: null checks, boundary conditions, exception handling, validation
-  * If identified, include "fix: " prefix and "Fixes #[issue]" in commit message
-
-- Feature: Adds new functionality
-  * Keywords: new components, new API endpoints, new UI elements
-  * If identified, include "feat: " prefix and "Implements #[feature]" in commit message
-
-- Refactor: Code improvements without behavior changes
-  * Keywords: renaming, restructuring, pattern application
-  * If identified, include "refactor: " prefix and "Refactors #[component/area]" in commit message
-
-- Documentation: Updates to comments, JSDoc, README, etc.
-  * If identified, include "docs: " prefix and "Updates docs for #[area]" in commit message
-
-- Performance: Optimizations for speed or resource usage
-  * Keywords: memoization, indexing, caching, lazy loading
-  * If identified, include "perf: " prefix and "Optimizes #[area]" in commit message
-
-- Security: Addresses security vulnerabilities
-  * Keywords: sanitization, validation, authentication, authorization
-  * If identified, include "security: " prefix and "Fixes vulnerability #[CVE/issue]" in commit message
-
-- Test: Changes to test files or test infrastructure
-  * If identified, include "test: " prefix and "Improves test coverage for #[area]" in commit message
-
-- Build: Changes to build scripts, CI configuration
-  * If identified, include "build: " prefix and "Updates build process for #[area]" in commit message
-
-## 6. File Focus
-- Prioritize analysis on files in src/ directory
-- Focus on functional code changes, not formatting or auto-generated files
-- Ignore changes to:
-  * lock files (package-lock.json, yarn.lock, pnpm-lock.yaml)
-  * Auto-generated files (*.min.js, *.generated.*)
-  * Config files without functional impact (tsconfig.json, .eslintrc, etc.)
-  * Binary files (images, fonts)
-  * Dependencies version bumps without code changes
-
-## 7. Review Importance
-- Assign higher importance to:
-  * Core business logic files
-  * Security-sensitive areas (authentication, authorization, input validation)
-  * Performance-critical paths
-  * API contracts and interfaces
-  * Database schema changes
-
-## 8. Pattern Recognition 
-- Identify and note common refactoring patterns:
-  * Extract method/component
-  * Rename variable/function/class
-  * Move method/function
-  * Replace conditional with polymorphism
-  * Introduce design pattern
-
-Git Diff Changes: ${tempModified.join('\n')}
-
-Format your response as a JSON object with the following structure:
-{
-  "commitMessage": "type(scope): Summary of changes\n\nDetailed explanation of changes...",
-  "prTitle": "type(scope): PR Title",
-  "prDescription": "## Summary\n[Comprehensive description with all sections outlined above]"
-}
-\`;
-`
-      logger.log('promptMsg', promptMsg)
-      const res = await llmService.generateCompletion('ollama', {
-        temperature: 0.1,
-        messages: [
-          // {
-          //   id: new Date().toISOString() + '1',
-          //   role: 'system',
-          //   content:
-          //     'You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:',
-          // },
-          {
-            id: new Date().toISOString() + '2',
-            content: promptMsg,
-            role: 'user',
-          },
-        ],
-      })
-      logger.log(green(`AI Response:`), res)
-      if (status.isClean()) {
-        logger.error(red(`No changes to commit!`))
+      // Get upstream branch tracking
+      logger.info(yellow('Next step: Determine the target branch for your PR'))
+      const proceedWithBranch = await logger.prompt(
+        green('Would you like to proceed with determining the target branch?'),
+        {
+          type: 'confirm',
+        },
+      )
+      if (!proceedWithBranch) {
+        logger.info(yellow('Process cancelled by user'))
         return
       }
-      logger.box(green(`Git status:`), {
-        type: 'info',
-        content: status,
+      const upstreamBranch = await getUpstreamBranch(git)
+
+      // Handle uncommitted changes
+      if (!status.isClean()) {
+        logger.info(yellow('Next step: Handle uncommitted changes in your working directory'))
+        const proceedWithChanges = await logger.prompt(green('Would you like to commit your uncommitted changes?'), {
+          type: 'confirm',
+        })
+        if (!proceedWithChanges) {
+          logger.info(yellow('Process cancelled by user'))
+          return
+        }
+        await handleUncommittedChanges(git, status)
+      } else {
+        logger.info(green('Working directory is clean'))
+      }
+
+      // Get all commits and optimize them
+      logger.info(yellow('Next step: Optimize existing commit messages'))
+      const proceedWithOptimize = await logger.prompt(green('Would you like to optimize your commit messages?'), {
+        type: 'confirm',
       })
+      if (!proceedWithOptimize) {
+        logger.info(yellow('Skipping commit message optimization'))
+      } else {
+        await optimizeCommitMessages(git, upstreamBranch)
+      }
+
+      // Create and push a new branch and PR
+      logger.info(yellow('Final step: Create a new branch and push PR to remote'))
+      const proceedWithPR = await logger.prompt(green('Would you like to proceed with creating a PR?'), {
+        type: 'confirm',
+      })
+      if (!proceedWithPR) {
+        logger.info(yellow('PR creation cancelled by user'))
+        return
+      }
+      await createAndPushPR(git, upstreamBranch)
     } catch (e) {
       logger.error(red((e as Error).message))
     }
   }
 }
+
+async function getUpstreamBranch(git: SimpleGit): Promise<string> {
+  try {
+    logger.info(green('Attempting to determine the upstream branch...'))
+
+    // Try to get the tracking branch directly
+    const branchInfo = await git.branch()
+    // tracking branch  // git rev-parse --abbrev-ref --symbolic-full-name @{u}
+    const trackingBranch = await git.revparse(['--abbrev-ref', '--symbolic-full-name', '@{u}']).catch(() => {
+      logger.info(yellow('No tracking branch found'))
+      return null
+    })
+
+    if (branchInfo.current && trackingBranch) {
+      logger.info(green(`Found tracking branch: ${trackingBranch}`))
+      const confirmTracking = await logger.prompt(green(`Use "${trackingBranch}" as the target branch?`), {
+        type: 'confirm',
+      })
+
+      if (confirmTracking) {
+        return trackingBranch
+      } else {
+        logger.info(yellow('You chose to select a different target branch'))
+      }
+    }
+
+    // If no tracking branch or user declined, get remote branches and ask user
+    logger.info(yellow('Fetching available remote branches...'))
+    const remoteBranches = await git.branch(['--remotes'])
+    const branches = remoteBranches.all.filter((branch) => !branch.includes('HEAD ->')).map((branch) => branch.trim())
+
+    if (branches.length === 0) {
+      throw new Error('No remote branches found')
+    }
+
+    // Ask user which branch to target
+    const targetBranch = await logger.prompt(yellow('Select target branch for PR:'), {
+      type: 'select',
+      options: branches,
+    })
+
+    logger.info(green(`Selected target branch: ${targetBranch}`))
+    const confirmSelected = await logger.prompt(green(`Confirm "${targetBranch}" as your target branch?`), {
+      type: 'confirm',
+    })
+
+    if (!confirmSelected) {
+      logger.info(yellow('Branch selection cancelled. Please start over.'))
+      process.exit(0)
+    }
+
+    return targetBranch
+  } catch (error) {
+    logger.error(red(`Failed to determine upstream branch: ${(error as Error).message}`))
+    throw error
+  }
+}
+
+async function handleUncommittedChanges(git: SimpleGit, status: StatusResult) {
+  logger.info(yellow('Found uncommitted changes in the working directory'))
+
+  const proceedWithAnalysis = await logger.prompt(green('Analyze changes with AI to generate a commit message?'), {
+    type: 'confirm',
+  })
+
+  if (!proceedWithAnalysis) {
+    logger.info(yellow('Commit creation cancelled'))
+    process.exit(0)
+  }
+
+  logger.info(yellow('Collecting modified file details for analysis...'))
+
+  const modifiedFiles =
+    status.modified?.filter((e) => {
+      return !['pnpm-lock.yaml', 'package-lock.json', 'tsconfig.json'].includes(e)
+    }) || []
+
+  const tempModified = [] as string[]
+  for (const file of modifiedFiles) {
+    logger.info(yellow(`Analyzing changes in: ${file}`))
+    const diff = await git.diff([file])
+    tempModified.push(`
+filename: ${file}
+diff changes: ${diff}
+____________=========================____________
+`)
+  }
+
+  logger.info(yellow('Generating commit message with AI...'))
+  const confirmAiRequest = await logger.prompt(green('Send changes to AI for commit message suggestion?'), {
+    type: 'confirm',
+  })
+
+  if (!confirmAiRequest) {
+    logger.info(yellow('AI message generation cancelled'))
+    process.exit(0)
+  }
+
+  const systemPrompt = `
+  You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
+
+    Provide a better commit message that clearly describes the change using the conventional commit format 
+(type(scope): description). Types include: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
+The message should be concise, clear, and follow best practices.
+
+Format your response as a JSON object with the following length and structure:
+- commitMessage: max 120 characters
+and the following structure:
+{
+  "commitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
+}
+`
+  logger.info(green('Sending changes to LLM for commit suggestion...'))
+  const res = await generateCompletion('ollama', {
+    logRequest: true,
+    temperature: 0.1,
+    prompt: `${systemPrompt}${tempModified.join('')}`,
+  })
+
+  let commitData: { commitMessage: string }
+  try {
+    commitData = JSON.parse(res.text)
+    if (!commitData.commitMessage) {
+      logger.error(red('No commit message found in LLM response'))
+      logger.debug('Raw response:', res)
+      throw new Error('Invalid LLM response format')
+    }
+    logger.info(green('Got commit suggestion:'))
+    logger.box({
+      title: 'Commit Message',
+      content: commitData.commitMessage,
+    })
+
+    const commitConfirm = await logger.prompt(green('Proceed with this commit?'), {
+      type: 'confirm',
+    })
+
+    if (commitConfirm) {
+      logger.info(yellow('Adding all changes to git...'))
+      await git.add('.')
+
+      logger.info(yellow('Creating commit with the suggested message...'))
+      await git.commit(commitData.commitMessage)
+      logger.success(green('Changes committed successfully!'))
+    } else {
+      logger.info(yellow('Commit cancelled'))
+      process.exit(0)
+    }
+  } catch (e) {
+    console.log('res', res, 'e', e)
+    logger.debug('Raw response:', res)
+    logger.error(red('Failed to parse LLM response as JSON'))
+    throw new Error('Invalid LLM response format')
+  }
+
+  return commitData
+}
+
+async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
+  logger.info(yellow('Starting commit message optimization process...'))
+
+  // Get all commits between current HEAD and upstream branch
+  logger.info(yellow('Fetching commits to optimize...'))
+  const commits = await git.log({
+    from: upstreamBranch,
+    to: 'HEAD',
+  })
+
+  if (!commits.all.length) {
+    logger.info(yellow('No commits to optimize'))
+    return
+  }
+
+  logger.info(green(`Found ${commits.all.length} commit(s) to optimize`))
+  const confirmOptimize = await logger.prompt(green(`Proceed with optimizing ${commits.all.length} commits?`), {
+    type: 'confirm',
+  })
+
+  if (!confirmOptimize) {
+    logger.info(yellow('Commit optimization cancelled'))
+    return
+  }
+
+  // Process commits in reverse order (oldest first)
+  for (const commit of [...commits.all].reverse()) {
+    // Get commit diff
+    logger.info(yellow(`Analyzing commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
+    const diff = await git.show([commit.hash])
+
+    const optimizeThisCommit = await logger.prompt(green(`Optimize commit "${commit.message}"?`), {
+      type: 'confirm',
+    })
+
+    if (!optimizeThisCommit) {
+      logger.info(yellow(`Skipping optimization for commit: ${commit.hash.substring(0, 7)}`))
+      continue
+    }
+
+    const systemPrompt = `
+${getSystemPrompt()}
+
+Provide a better commit message that clearly describes the change using the conventional commit format 
+(type(scope): description). Types include: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
+The message should be concise, clear, and follow best practices.
+
+Format your response as a JSON object with the following length structure:
+- improvedCommitMessage: max 120 characters
+and the following structure:
+{
+  "improvedCommitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
+}`
+    // Ask LLM for a better commit message
+    const promptMsg = `
+
+Current commit message: "${commit.message}"
+
+Commit diff:
+${diff}
+
+}
+`
+    logger.info(yellow(`Requesting improved commit message from AI...`))
+
+    const res = await generateCompletion('ollama', {
+      temperature: 0.1,
+      prompt: `${systemPrompt}${promptMsg}`,
+    })
+
+    try {
+      const optimizedCommit = JSON.parse(res.text)
+      logger.box({
+        title: `Original: ${commit.message}`,
+        content: `Improved: ${optimizedCommit.improvedCommitMessage}`,
+      })
+
+      const amendConfirm = await logger.prompt(green('Use this improved commit message?'), {
+        type: 'confirm',
+      })
+
+      if (amendConfirm) {
+        logger.info(yellow(`Amending commit ${commit.hash.substring(0, 7)}...`))
+        // Amend the commit message
+        await git.raw([
+          'commit',
+          '--amend',
+          '-m',
+          optimizedCommit.improvedCommitMessage,
+          '--no-edit',
+          '--fixup=' + commit.hash,
+        ])
+
+        logger.info(yellow('Running interactive rebase to apply changes...'))
+        await git.raw(['rebase', '--interactive', '--autosquash', `${commit.hash}~1`])
+        logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
+      } else {
+        logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
+      }
+    } catch (e) {
+      logger.error(red(`Failed to optimize commit ${commit.hash.substring(0, 7)}`))
+      logger.debug('Raw response:', res)
+    }
+  }
+
+  logger.success(green('Commit message optimization complete'))
+}
+
+async function createAndPushPR(git: SimpleGit, upstreamBranch: string) {
+  logger.info(green('Preparing to create a new branch and PR'))
+
+  // Get the latest commit to use for branch name suggestion and PR details
+  logger.info(yellow('Fetching latest commit for PR details...'))
+  const latestCommit = await git.log(['-1'])
+  const commitMessage = latestCommit.latest?.message || ''
+
+  const generatePrDetails = await logger.prompt(green('Generate PR details with AI based on your commits?'), {
+    type: 'confirm',
+  })
+
+  if (!generatePrDetails) {
+    logger.info(yellow('PR creation cancelled'))
+    return
+  }
+
+  // Generate PR details using LLM
+  logger.info(yellow('Requesting PR suggestions from AI...'))
+  const systemPrompt = `
+${getSystemPrompt()}
+
+Format your response as a JSON object with the following length and structure:
+- suggestedBranchName: max 50 characters
+- prTitle: max 100 characters
+- prDescription: max 2000 characters
+and the following structure:
+{
+  "suggestedBranchName": "feature/descriptive-name",
+  "prTitle": "type(scope): PR Title",
+  "prDescription": "## Summary\\n[Comprehensive description of the changes]"
+}
+`
+
+  const prPrompt = `
+Based on this commit message, suggest a branch name, PR title and description for a pull request:
+
+Commit message: ${commitMessage}
+
+`
+
+  const res = await generateCompletion('ollama', {
+    temperature: 0.1,
+    prompt: `${systemPrompt}${prPrompt}`,
+  })
+
+  let prData
+  try {
+    prData = JSON.parse(res.text)
+
+    // Show PR details and confirm
+    logger.box({
+      title: 'Pull Request Details',
+      content: `
+Branch: ${prData.suggestedBranchName}
+Title: ${prData.prTitle}
+Description: 
+${prData.prDescription}
+`,
+    })
+
+    const createPRConfirm = await logger.prompt(green('Create PR with these details?'), {
+      type: 'confirm',
+    })
+
+    if (createPRConfirm) {
+      // Create new branch
+      logger.info(yellow(`Creating new branch: ${prData.suggestedBranchName}...`))
+      const createBranchConfirm = await logger.prompt(
+        green(`Confirm creation of branch "${prData.suggestedBranchName}"?`),
+        {
+          type: 'confirm',
+        },
+      )
+
+      if (!createBranchConfirm) {
+        logger.info(yellow('Branch creation cancelled'))
+        return
+      }
+
+      await git.checkoutLocalBranch(prData.suggestedBranchName)
+      logger.success(green(`Created and switched to branch: ${prData.suggestedBranchName}`))
+
+      // Push to remote
+      logger.info(yellow('Preparing to push branch to remote...'))
+      const pushConfirm = await logger.prompt(green('Push branch to remote repository?'), {
+        type: 'confirm',
+      })
+
+      if (!pushConfirm) {
+        logger.info(yellow('Remote push cancelled'))
+        return
+      }
+
+      logger.info(yellow('Pushing to remote repository...'))
+      await git.push('origin', prData.suggestedBranchName, ['--set-upstream'])
+      logger.success(green(`Pushed branch to remote`))
+
+      // Create PR using GitHub CLI if available, otherwise provide instructions
+      logger.info(yellow('Creating pull request...'))
+      const createGhPrConfirm = await logger.prompt(green('Create GitHub PR using GitHub CLI?'), {
+        type: 'confirm',
+      })
+
+      if (createGhPrConfirm) {
+        try {
+          const { execa } = await import('execa')
+          const upstreamTarget = upstreamBranch.replace('origin/', '')
+
+          logger.info(yellow('Creating PR using GitHub CLI...'))
+          await execa('gh', [
+            'pr',
+            'create',
+            '--title',
+            prData.prTitle,
+            '--body',
+            prData.prDescription,
+            '--base',
+            upstreamTarget,
+          ])
+
+          logger.success(green('Pull request created successfully!'))
+        } catch (e) {
+          // Provide manual instructions if GitHub CLI fails or is not available
+          logger.warn(yellow('Could not automatically create PR. Please create it manually with:'))
+          logger.info(`
+Title: ${prData.prTitle}
+Description: 
+${prData.prDescription}
+From: ${prData.suggestedBranchName}
+To: ${upstreamBranch.replace('origin/', '')}
+`)
+        }
+      } else {
+        logger.info(yellow('GitHub CLI PR creation skipped. Create PR manually using:'))
+        logger.info(`
+Title: ${prData.prTitle}
+Description: 
+${prData.prDescription}
+From: ${prData.suggestedBranchName}
+To: ${upstreamBranch.replace('origin/', '')}
+`)
+      }
+    } else {
+      logger.info(yellow('PR creation cancelled'))
+    }
+  } catch (e) {
+    logger.error(red('Failed to parse LLM response for PR details'))
+    logger.debug('Raw response:', res)
+  }
+}
+
+function getSystemPrompt() {
+  return ''
+}
+
+function generateLlmPrompt(diffChanges: string) {
+  const systemPrompt = `
+  ${getSystemPrompt()}
+  
+ALWAYS Format your response as a JSON object with the following length and structure:
+- suggestedBranchName: max 50 characters
+- commitMessage: max 120 characters
+- prTitle: max 100 characters
+- prDescription: max 2000 characters
+and the following structure:
+{
+  "suggestedBranchName": "feature/your-feature-name", 
+  "commitMessage": "type(scope): Summary of changes nDetailed explanation of changes...",
+  "prTitle": "type(scope): PR Title", # max 100 characters
+  "prDescription": "## Summary [Comprehensive description with all sections outlined above]"
+}
+
+  `
+  const userPrompt = `
+PLEASE ANALYZE THE FOLLOWING GIT DIFF AND GENERATE A RESPONSE AS REQUESTED.
+Diff Changes: ${diffChanges}
+`
+  return `${systemPrompt}${userPrompt}`
+}
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
+const _ = generateLlmPrompt('')
