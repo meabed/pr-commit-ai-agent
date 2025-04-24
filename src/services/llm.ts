@@ -28,11 +28,7 @@ interface LLMLogEntry {
   timestamp: string
   provider: LLMProvider
   model: string
-  request: {
-    prompt: string
-    temperature?: number
-    maxTokens?: number
-  }
+  options: CompletionOptions
   response?: string
   error?: string
   executionTimeMs?: number
@@ -88,16 +84,7 @@ const logRequest = async (logEntry: LLMLogEntry): Promise<string> => {
     await fs.appendFile(logFilePath, JSON.stringify(logEntry) + '\n', { encoding: 'utf8' })
 
     // Save the request part separately in a structured JSON file for easy reuse
-    const requestData = {
-      id: logEntry.id,
-      provider: logEntry.provider,
-      model: logEntry.model,
-      prompt: logEntry.request.prompt,
-      temperature: logEntry.request.temperature,
-      maxTokens: logEntry.request.maxTokens,
-    }
-
-    await fs.writeFile(requestFilePath, JSON.stringify(requestData, null, 2), { encoding: 'utf8' })
+    await fs.writeFile(requestFilePath, JSON.stringify(logEntry, null, 2), { encoding: 'utf8' })
 
     logger.debug(`Logged LLM request to ${logFilePath}`)
     logger.info(green(`Request saved as ${requestFilePath} (ID: ${logEntry.id})`))
@@ -306,8 +293,10 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
     prompt: options.prompt,
     format: 'json',
     options: {
-      temperature: options.temperature || 0.1,
-      num_ctx: 16000,
+      temperature: options.temperature || 0.1, // I don't want entropy injected into my code
+      num_ctx: 32768, // More useful default
+      num_batch: 1024, // Faster, but more vRAM
+      top_p: 0.8, // Quality
       system: getSystemPrompt(),
     } as OllamaGenerateOptions,
   })
@@ -354,11 +343,7 @@ export const generateCompletion = async (
     timestamp: new Date().toISOString(),
     provider,
     model,
-    request: {
-      prompt: options.prompt,
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-    },
+    options,
   }
 
   try {
