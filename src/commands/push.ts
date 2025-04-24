@@ -331,6 +331,16 @@ ${diff}
     }
   }
 
+  // Log the list of commits and their messages after optimization
+  const updatedCommits = await git.log({
+    from: upstreamBranch,
+    to: 'HEAD',
+  })
+  logger.info(green('Updated list of commits after optimization:'))
+  updatedCommits.all.forEach((commit) => {
+    logger.info(`${commit.hash.substring(0, 7)} - ${commit.message}`)
+  })
+
   logger.success(green('Commit message optimization complete'))
 }
 
