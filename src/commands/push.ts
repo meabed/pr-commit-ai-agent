@@ -236,7 +236,7 @@ and the following structure:
 async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
   logger.info(yellow('Starting commit message optimization process...'))
 
-  // Get all commits between current HEAD and upstream branch
+  // Get all commits between current HEAD and upstream branch.
   logger.info(yellow('Fetching commits to optimize...'))
   const commits = await git.log({
     from: upstreamBranch,
