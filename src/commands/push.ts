@@ -285,8 +285,26 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
 
   logger.info(green(`Found ${commits.all.length} commit(s) to optimize`))
 
+  // Show all commits that will be processed
+  logger.info(yellow('The following commits will be analyzed for optimization:'))
+
   // Process commits in reverse order (oldest first)
-  for (const commit of [...commits.all].reverse()) {
+  const commitsToProcess = [...commits.all].reverse()
+  commitsToProcess.forEach((commit, index) => {
+    logger.info(`${index + 1}. ${commit.hash.substring(0, 7)} - ${commit.message}`)
+  })
+
+  const continueOptimization = await logger.prompt(green('Continue with commit message optimization?'), {
+    type: 'confirm',
+  })
+
+  if (!continueOptimization) {
+    logger.info(yellow('Commit message optimization cancelled'))
+    return
+  }
+
+  // Process commits in reverse order (oldest first)
+  for (const commit of commitsToProcess) {
     // Check if this is a merge commit (has multiple parents)
     const revList = await git.raw(['rev-list', '--parents', '-n', '1', commit.hash])
     const parentHashes = revList.trim().split(' ')
@@ -355,22 +373,48 @@ ${diff}
       const analysis = JSON.parse(res.text)
 
       if (analysis.needsImprovement) {
-        logger.info(green(`Amending commit ${commit.hash.substring(0, 7)} with improved message...`))
+        logger.info(green(`AI suggests improving this commit message`))
+        logger.box({
+          title: 'Commit Message Comparison',
+          content: `
+Current message: 
+"${commit.message}"
 
-        // Reset to the parent of the commit to amend
-        await git.raw(['reset', '--soft', `${commit.hash}^`])
+Suggested message:
+"${analysis.improvedCommitMessage}"
 
-        // Re-commit the changes with the new message
-        const newCommit = await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+Reason for improvement:
+${analysis.reason}
+`,
+        })
 
-        // Mark the new commit as created by our tool
-        if (newCommit.commit) {
-          await markCommitAsCreatedByTool(git, newCommit.commit)
+        const amendConfirm = await logger.prompt(
+          green(`Amend commit ${commit.hash.substring(0, 7)} with the improved message?`),
+          {
+            type: 'confirm',
+          },
+        )
+
+        if (amendConfirm) {
+          logger.info(green(`Amending commit ${commit.hash.substring(0, 7)}...`))
+
+          // Reset to the parent of the commit to amend
+          await git.raw(['reset', '--soft', `${commit.hash}^`])
+
+          // Re-commit the changes with the new message
+          const newCommit = await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+
+          // Mark the new commit as created by our tool
+          if (newCommit.commit) {
+            await markCommitAsCreatedByTool(git, newCommit.commit)
+          }
+
+          logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
+        } else {
+          logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
         }
-
-        logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
       } else {
-        logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}`))
+        logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}: ${analysis.reason}`))
       }
     } catch (e) {
       logger.error(red(`Failed to optimize commit ${commit.hash.substring(0, 7)}`))
