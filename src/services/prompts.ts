@@ -1,3 +1,4 @@
+// get system prompt for llms
 export function getSystemPrompt() {
   return `You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
 
