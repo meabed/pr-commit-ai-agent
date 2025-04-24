@@ -248,14 +248,6 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
   }
 
   logger.info(green(`Found ${commits.all.length} commit(s) to optimize`))
-  const confirmOptimize = await logger.prompt(green(`Proceed with optimizing ${commits.all.length} commits?`), {
-    type: 'confirm',
-  })
-
-  if (!confirmOptimize) {
-    logger.info(yellow('Commit optimization cancelled'))
-    return
-  }
 
   // Process commits in reverse order (oldest first)
   for (const commit of [...commits.all].reverse()) {
@@ -272,15 +264,6 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     // Get commit diff
     logger.info(yellow(`Analyzing commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
     const diff = await git.show([commit.hash])
-
-    const optimizeThisCommit = await logger.prompt(green(`Optimize commit "${commit.message}"?`), {
-      type: 'confirm',
-    })
-
-    if (!optimizeThisCommit) {
-      logger.info(yellow(`Skipping optimization for commit: ${commit.hash.substring(0, 7)}`))
-      continue
-    }
 
     const systemPrompt = `
 ${getSystemPrompt()}
@@ -317,43 +300,16 @@ ${diff}
       const analysis = JSON.parse(res.text)
 
       if (analysis.needsImprovement) {
-        logger.box({
-          title: `Analysis: Commit needs improvement`,
-          content: `Reason: ${analysis.reason}\n\nOriginal: ${commit.message}\nImproved: ${analysis.improvedCommitMessage}`,
-        })
+        logger.info(green(`Amending commit ${commit.hash.substring(0, 7)} with improved message...`))
 
-        const amendConfirm = await logger.prompt(green('Use this improved commit message?'), {
-          type: 'confirm',
-        })
+        // Reset to the parent of the commit to amend
+        await git.raw(['reset', '--soft', `${commit.hash}^`])
 
-        if (amendConfirm) {
-          logger.info(yellow(`Amending commit ${commit.hash.substring(0, 7)}...`))
+        // Re-commit the changes with the new message
+        await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
 
-          // Store the current branch and commit
-          const currentBranch = (await git.branch()).current
-          const currentHead = await git.revparse(['HEAD'])
-
-          // Reset to the parent of the commit to amend
-          await git.raw(['reset', '--soft', `${commit.hash}^`])
-
-          // Re-commit the changes with the new message
-          await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
-
-          // Move the branch pointer to the new commit
-          await git.raw(['branch', '-f', currentBranch, 'HEAD'])
-
-          // Reset to the current HEAD to continue processing
-          await git.raw(['reset', '--hard', currentHead])
-
-          logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
-        } else {
-          logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
-        }
+        logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
       } else {
-        logger.box({
-          title: `Analysis: Commit is sufficient`,
-          content: `Reason: ${analysis.reason}\n\nCurrent message: ${commit.message}`,
-        })
         logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}`))
       }
     } catch (e) {
