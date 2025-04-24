@@ -188,7 +188,7 @@ Format your response as a JSON object with the following length and structure:
 - commitMessage: max 120 characters
 and the following structure:
 {
-  "commitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
+  "commitMessage": "type(scope): summary of changes detailed explanation of changes..."
 }
 `
 
@@ -285,8 +285,26 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
 
   logger.info(green(`Found ${commits.all.length} commit(s) to optimize`))
 
+  // Show all commits that will be processed
+  logger.info(yellow('The following commits will be analyzed for optimization:'))
+
   // Process commits in reverse order (oldest first)
-  for (const commit of [...commits.all].reverse()) {
+  const commitsToProcess = [...commits.all].reverse()
+  commitsToProcess.forEach((commit, index) => {
+    logger.info(`${index + 1}. ${commit.hash.substring(0, 7)} - ${commit.message}`)
+  })
+
+  const continueOptimization = await logger.prompt(green('Continue with commit message optimization?'), {
+    type: 'confirm',
+  })
+
+  if (!continueOptimization) {
+    logger.info(yellow('Commit message optimization cancelled'))
+    return
+  }
+
+  // Process commits in reverse order (oldest first)
+  for (const commit of commitsToProcess) {
     // Check if this is a merge commit (has multiple parents)
     const revList = await git.raw(['rev-list', '--parents', '-n', '1', commit.hash])
     const parentHashes = revList.trim().split(' ')
@@ -332,7 +350,7 @@ Format your response as a JSON object with the following structure:
 {
   "needsImprovement": true|false,
   "reason": "Brief explanation of why the commit needs improvement or why it's already sufficient",
-  "improvedCommitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
+  "improvedCommitMessage": "type(scope): summary of changes detailed explanation of changes..."
 }
 
 The "improvedCommitMessage" should only be provided if "needsImprovement" is true, and should be max 120 characters.
@@ -355,22 +373,41 @@ ${diff}
       const analysis = JSON.parse(res.text)
 
       if (analysis.needsImprovement) {
-        logger.info(green(`Amending commit ${commit.hash.substring(0, 7)} with improved message...`))
+        logger.info(green(`AI suggests improving this commit message`))
+        logger.box({
+          title: 'Commit Message Comparison',
+          current: commit.message,
+          improved: analysis.improvedCommitMessage,
+          reason: analysis.reason,
+        })
 
-        // Reset to the parent of the commit to amend
-        await git.raw(['reset', '--soft', `${commit.hash}^`])
+        const amendConfirm = await logger.prompt(
+          green(`Amend commit ${commit.hash.substring(0, 7)} with the improved message?`),
+          {
+            type: 'confirm',
+          },
+        )
 
-        // Re-commit the changes with the new message
-        const newCommit = await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+        if (amendConfirm) {
+          logger.info(green(`Amending commit ${commit.hash.substring(0, 7)}...`))
 
-        // Mark the new commit as created by our tool
-        if (newCommit.commit) {
-          await markCommitAsCreatedByTool(git, newCommit.commit)
+          // Reset to the parent of the commit to amend
+          await git.raw(['reset', '--soft', `${commit.hash}^`])
+
+          // Re-commit the changes with the new message
+          const newCommit = await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+
+          // Mark the new commit as created by our tool
+          if (newCommit.commit) {
+            await markCommitAsCreatedByTool(git, newCommit.commit)
+          }
+
+          logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
+        } else {
+          logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
         }
-
-        logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
       } else {
-        logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}`))
+        logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}: ${analysis.reason}`))
       }
     } catch (e) {
       logger.error(red(`Failed to optimize commit ${commit.hash.substring(0, 7)}`))
@@ -442,12 +479,9 @@ Commit message: ${commitMessage}
     // Show PR details and confirm
     logger.box({
       title: 'Pull Request Details',
-      content: `
-Branch: ${prData.suggestedBranchName}
-Title: ${prData.prTitle}
-Description: 
-${prData.prDescription}
-`,
+      branch: prData.suggestedBranchName,
+      prTitle: prData.prTitle,
+      description: prData.prDescription,
     })
 
     const createPRConfirm = await logger.prompt(green('Create PR with these details?'), {
@@ -557,7 +591,7 @@ ALWAYS Format your response as a JSON object with the following length and struc
 and the following structure:
 {
   "suggestedBranchName": "feature/your-feature-name", 
-  "commitMessage": "type(scope): Summary of changes nDetailed explanation of changes...",
+  "commitMessage": "type(scope): summary of changes detailed explanation of changes...",
   "prTitle": "type(scope): PR Title",
   "prDescription": "## Summary [Comprehensive description with all sections outlined above]"
 }
