@@ -188,7 +188,7 @@ Format your response as a JSON object with the following length and structure:
 - commitMessage: max 120 characters
 and the following structure:
 {
-  "commitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
+  "commitMessage": "type(scope): summary of changes detailed explanation of changes..."
 }
 `
 
@@ -332,7 +332,7 @@ Format your response as a JSON object with the following structure:
 {
   "needsImprovement": true|false,
   "reason": "Brief explanation of why the commit needs improvement or why it's already sufficient",
-  "improvedCommitMessage": "type(scope): Summary of changes Detailed explanation of changes..."
+  "improvedCommitMessage": "type(scope): summary of changes detailed explanation of changes..."
 }
 
 The "improvedCommitMessage" should only be provided if "needsImprovement" is true, and should be max 120 characters.
@@ -557,7 +557,7 @@ ALWAYS Format your response as a JSON object with the following length and struc
 and the following structure:
 {
   "suggestedBranchName": "feature/your-feature-name", 
-  "commitMessage": "type(scope): Summary of changes nDetailed explanation of changes...",
+  "commitMessage": "type(scope): summary of changes detailed explanation of changes...",
   "prTitle": "type(scope): PR Title",
   "prDescription": "## Summary [Comprehensive description with all sections outlined above]"
 }
