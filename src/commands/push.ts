@@ -376,16 +376,9 @@ ${diff}
         logger.info(green(`AI suggests improving this commit message`))
         logger.box({
           title: 'Commit Message Comparison',
-          content: `
-Current message: 
-"${commit.message}"
-
-Suggested message:
-"${analysis.improvedCommitMessage}"
-
-Reason for improvement:
-${analysis.reason}
-`,
+          current: commit.message,
+          improved: analysis.improvedCommitMessage,
+          reason: analysis.reason,
         })
 
         const amendConfirm = await logger.prompt(
@@ -486,12 +479,9 @@ Commit message: ${commitMessage}
     // Show PR details and confirm
     logger.box({
       title: 'Pull Request Details',
-      content: `
-Branch: ${prData.suggestedBranchName}
-Title: ${prData.prTitle}
-Description: 
-${prData.prDescription}
-`,
+      branch: prData.suggestedBranchName,
+      prTitle: prData.prTitle,
+      description: prData.prDescription,
     })
 
     const createPRConfirm = await logger.prompt(green('Create PR with these details?'), {
