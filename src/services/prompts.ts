@@ -1,4 +1,4 @@
-// get system prompt for llms
+// get system prompt for llms ( e.g. ollama, gpt-3.5-turbo, gpt-4, etc.)
 export function getSystemPrompt() {
   return `You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
 

@@ -1,6 +1,5 @@
 # GitHub PR and Commit AI Agent
 
-
 ## Features
 
 ## Prerequisites
