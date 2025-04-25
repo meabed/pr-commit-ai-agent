@@ -10,6 +10,10 @@
       "prerelease": true
     },
     {
+      "name": "develop",
+      "prerelease": true
+    },
+    {
       "name": "alpha",
       "prerelease": true
     }
