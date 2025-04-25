@@ -351,10 +351,31 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
   logger.info(yellow('The following commits will be analyzed for optimization:'))
 
   // Process commits in reverse order (oldest first)
-  const commitsToProcess = [...commits.all].reverse()
+  let commitsToProcess = [...commits.all].reverse()
+
+  // Filter out commits created by PR Agent before entering the loop
+  logger.info(yellow('Filtering out commits created by PR Agent...'))
+  const filteredCommits = []
+  for (const commit of commitsToProcess) {
+    // Check if the commit was created by this tool
+    const isToolCommit = await isCommitCreatedByTool(git, commit.hash)
+    if (isToolCommit) {
+      logger.info(yellow(`Skipping commit created by PR Agent: ${commit.hash.substring(0, 7)} - ${commit.message}`))
+      continue
+    }
+    filteredCommits.push(commit)
+  }
+
+  commitsToProcess = filteredCommits
+
   commitsToProcess.forEach((commit, index) => {
     logger.info(`${index + 1}. ${commit.hash.substring(0, 7)} - ${commit.message}`)
   })
+
+  if (commitsToProcess.length === 0) {
+    logger.info(yellow('No commits to optimize after filtering'))
+    return
+  }
 
   const continueOptimization = await logger.prompt(green('Continue with commit message optimization?'), {
     type: 'confirm',
@@ -374,13 +395,6 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     // If there are more than 2 entries (commit hash + parent hashes), it's a merge commit
     if (parentHashes.length > 2) {
       logger.info(yellow(`Skipping merge commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
-      continue
-    }
-
-    // Check if the commit was created by this tool in the current session
-    const isToolCommit = await isCommitCreatedByTool(git, commit.hash)
-    if (isToolCommit) {
-      logger.info(yellow(`Skipping commit created by PR Agent: ${commit.hash.substring(0, 7)} - ${commit.message}`))
       continue
     }
 
@@ -507,6 +521,10 @@ async function createAndPushPR(git: SimpleGit, upstreamBranch: string) {
   const latestCommit = await git.log(['-1'])
   const commitMessage = latestCommit.latest?.message || ''
 
+  // Get current branch
+  const branchSummary = await git.branch()
+  const currentBranch = branchSummary.current
+
   const generatePrDetails = await logger.prompt(green('Generate PR details with AI based on your commits?'), {
     type: 'confirm',
   })
@@ -565,25 +583,36 @@ Commit message: ${commitMessage}
     })
 
     if (createPRConfirm) {
-      // Create new branch
-      logger.info(yellow(`Creating new branch: ${prData.suggestedBranchName}...`))
-      const createBranchConfirm = await logger.prompt(
-        green(`Confirm creation of branch "${prData.suggestedBranchName}"?`),
-        {
-          type: 'confirm',
-        },
-      )
+      let branchToPush = currentBranch
+      const targetBranchName = upstreamBranch.replace('origin/', '')
 
-      if (!createBranchConfirm) {
-        logger.info(yellow('Branch creation cancelled'))
-        return
+      // Only create a new branch if the current branch is the target branch
+      if (currentBranch === targetBranchName) {
+        // Create new branch
+        logger.info(
+          yellow(`Current branch is the same as target branch. Creating new branch: ${prData.suggestedBranchName}...`),
+        )
+        const createBranchConfirm = await logger.prompt(
+          green(`Confirm creation of branch "${prData.suggestedBranchName}"?`),
+          {
+            type: 'confirm',
+          },
+        )
+
+        if (!createBranchConfirm) {
+          logger.info(yellow('Branch creation cancelled'))
+          return
+        }
+
+        await git.checkoutLocalBranch(prData.suggestedBranchName)
+        branchToPush = prData.suggestedBranchName
+        logger.success(green(`Created and switched to branch: ${branchToPush}`))
+      } else {
+        logger.info(yellow(`Using current branch "${currentBranch}" for PR`))
       }
 
-      await git.checkoutLocalBranch(prData.suggestedBranchName)
-      logger.success(green(`Created and switched to branch: ${prData.suggestedBranchName}`))
-
       // Push to remote
-      logger.info(yellow('Preparing to push branch to remote...'))
+      logger.info(yellow(`Preparing to push branch "${branchToPush}" to remote...`))
       const pushConfirm = await logger.prompt(green('Push branch to remote repository?'), {
         type: 'confirm',
       })
@@ -594,7 +623,7 @@ Commit message: ${commitMessage}
       }
 
       logger.info(yellow('Pushing to remote repository...'))
-      await git.push('origin', prData.suggestedBranchName, ['--set-upstream'])
+      await git.push('origin', branchToPush, ['--set-upstream'])
       logger.success(green(`Pushed branch to remote`))
 
       // Create PR using GitHub CLI if available, otherwise provide instructions
@@ -628,7 +657,7 @@ Commit message: ${commitMessage}
 Title: ${prData.prTitle}
 Description: 
 ${prData.prDescription}
-From: ${prData.suggestedBranchName}
+From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `)
         }
@@ -638,7 +667,7 @@ To: ${upstreamBranch.replace('origin/', '')}
 Title: ${prData.prTitle}
 Description: 
 ${prData.prDescription}
-From: ${prData.suggestedBranchName}
+From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `)
       }
