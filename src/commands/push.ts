@@ -518,9 +518,14 @@ async function createAndPushPR(git: SimpleGit, upstreamBranch: string) {
 
   // Generate PR details using LLM
   logger.info(yellow('Requesting PR suggestions from AI...'))
+  // get existing branch names to exclude them from suggestions
+  const existingBranches = await git.branchLocal()
+  const existingBranchNames = existingBranches.all.map((branch) => branch.trim()).join(', ')
+
   const systemPrompt = `
 ${getSystemPrompt()}
 
+Exclude the following branches from suggestions: ${existingBranchNames}
 Format your response as a JSON object with the following length and structure:
 - suggestedBranchName: max 50 characters
 - prTitle: max 100 characters
