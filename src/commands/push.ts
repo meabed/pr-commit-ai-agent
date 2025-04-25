@@ -1,3 +1,16 @@
+/**
+ * Push Command Module
+ *
+ * This module implements the 'push' command which helps users create AI-assisted
+ * pull requests. It provides functionality for optimizing commit messages,
+ * creating branch names, generating PR titles and descriptions using AI.
+ *
+ * The workflow includes:
+ * 1. Determining the target branch
+ * 2. Handling uncommitted changes
+ * 3. Optimizing existing commit messages
+ * 4. Creating and pushing a PR with AI-generated content
+ */
 import * as process from 'node:process'
 import { logger } from '../logger'
 import { green, red, yellow } from 'picocolors'
@@ -8,6 +21,9 @@ export const command = 'push'
 export const describe = 'Create PR and push to remote'
 export const aliases = ['c']
 
+/**
+ * Main handler for the push command - implements the workflow for creating an AI-assisted PR
+ */
 export async function handler() {
   const ready = await logger.prompt(green(`Are you ready to create an AI PR?`), {
     type: 'confirm',
@@ -77,10 +93,23 @@ export async function handler() {
     }
   }
 }
+
+// Files to exclude from diff analysis to reduce noise and focus on meaningful code changes
 const ignoredFiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json']
+
+// Namespace and message used for git notes to track commits created by this tool
 const PR_AGENT_NOTE_NAMESPACE = 'pr-agent'
 const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent'
 
+/**
+ * Determines the upstream branch to use as the target for PR creation
+ *
+ * First tries to detect the current tracking branch, and if none exists or user declines,
+ * presents a list of available remote branches to choose from.
+ *
+ * @param git - SimpleGit instance
+ * @returns Promise resolving to the selected upstream branch name
+ */
 async function getUpstreamBranch(git: SimpleGit): Promise<string> {
   try {
     logger.info(green('Attempting to determine the upstream branch...'))
@@ -137,6 +166,16 @@ async function getUpstreamBranch(git: SimpleGit): Promise<string> {
   }
 }
 
+/**
+ * Handles uncommitted changes in the working directory
+ *
+ * Uses AI to analyze file changes and generate an appropriate commit message,
+ * then commits the changes with that message.
+ *
+ * @param git - SimpleGit instance
+ * @param status - Current git status
+ * @returns Promise resolving to commit data
+ */
 async function handleUncommittedChanges(git: SimpleGit, status: StatusResult) {
   logger.info(yellow('Found uncommitted changes in the working directory'))
 
@@ -151,11 +190,13 @@ async function handleUncommittedChanges(git: SimpleGit, status: StatusResult) {
 
   logger.info(yellow('Collecting modified file details for analysis...'))
 
+  // Filter out lock files and other noise from analysis
   const modifiedFiles =
     status.modified?.filter((e) => {
       return !ignoredFiles.includes(e)
     }) || []
 
+  // Build a string containing all file diffs for AI analysis
   const tempModified = [] as string[]
   for (const file of modifiedFiles) {
     logger.info(yellow(`Analyzing changes in: ${file}`))
@@ -177,6 +218,7 @@ ____________=========================____________
     process.exit(0)
   }
 
+  // Prompt for AI to generate a good commit message following conventions
   const systemPrompt = `
   You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
 
@@ -243,6 +285,11 @@ and the following structure:
 
 /**
  * Marks a commit as created by the PR Agent tool using git notes
+ *
+ * This allows the tool to identify its own commits in later operations
+ *
+ * @param git - SimpleGit instance
+ * @param commitHash - Hash of the commit to mark
  */
 async function markCommitAsCreatedByTool(git: SimpleGit, commitHash: string) {
   try {
@@ -257,6 +304,12 @@ async function markCommitAsCreatedByTool(git: SimpleGit, commitHash: string) {
 
 /**
  * Checks if a commit was created by the PR Agent tool
+ *
+ * Reads git notes to determine if a commit was previously created by this tool
+ *
+ * @param git - SimpleGit instance
+ * @param commitHash - Hash of the commit to check
+ * @returns Promise resolving to boolean indicating if commit was created by tool
  */
 async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promise<boolean> {
   try {
@@ -268,6 +321,15 @@ async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promis
   }
 }
 
+/**
+ * Optimizes commit messages for all commits between current HEAD and upstream branch
+ *
+ * Uses AI to analyze each commit and suggest better commit messages that follow
+ * conventional commit format. Skips merge commits and commits already created by this tool.
+ *
+ * @param git - SimpleGit instance
+ * @param upstreamBranch - Name of the upstream branch
+ */
 async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
   logger.info(yellow('Starting commit message optimization process...'))
 
@@ -324,7 +386,7 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
 
     // Get commit diff
     logger.info(yellow(`Analyzing commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
-    // ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis ':!some/path' ':!some/other/path'
+    // ignore specific files that don't add value to the analysis
     const diff = await git.show([
       commit.hash,
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
@@ -428,6 +490,15 @@ ${diff}
   logger.success(green('Commit message optimization complete'))
 }
 
+/**
+ * Creates a new branch and pushes it to remote, then creates a PR
+ *
+ * Uses AI to generate a branch name, PR title, and PR description based on the
+ * latest commit message.
+ *
+ * @param git - SimpleGit instance
+ * @param upstreamBranch - Name of the upstream branch
+ */
 async function createAndPushPR(git: SimpleGit, upstreamBranch: string) {
   logger.info(green('Preparing to create a new branch and PR'))
 
@@ -575,10 +646,24 @@ To: ${upstreamBranch.replace('origin/', '')}
   }
 }
 
+/**
+ * Returns a system prompt for use with LLM requests
+ *
+ * Currently empty but can be used to add standard instructions for all LLM prompts
+ */
 function getSystemPrompt() {
   return ''
 }
 
+/**
+ * Generates a prompt for LLM to analyze diff changes
+ *
+ * This combines a system prompt with the diff changes to form a complete
+ * prompt for the LLM to generate PR metadata.
+ *
+ * @param diffChanges - String containing git diff output
+ * @returns Complete prompt string for LLM
+ */
 function generateLlmPrompt(diffChanges: string) {
   const systemPrompt = `
   ${getSystemPrompt()}
