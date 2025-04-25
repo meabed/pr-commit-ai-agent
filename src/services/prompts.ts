@@ -84,7 +84,7 @@ Based on file patterns and code change patterns, classify the change appropriate
   * Config files without functional impact (tsconfig.json, .eslintrc, etc.)
   * Binary files (images, fonts)
   * Dependencies version bumps without code changes
-
+  * Ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis.
 ## 7. Review Importance
 - Assign higher importance to:
   * Core business logic files
@@ -101,7 +101,7 @@ Based on file patterns and code change patterns, classify the change appropriate
   * Replace conditional with polymorphism
   * Introduce design pattern
 
-## 8. Ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis.
+## 9. all generated content should be in the correct sentence case capitalization
 
 `
 }
