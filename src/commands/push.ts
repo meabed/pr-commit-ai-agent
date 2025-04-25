@@ -6,7 +6,7 @@
  * creating branch names, generating PR titles and descriptions using AI.
  *
  * The workflow includes:
- * 1. Determining the target branch
+ * 1. Determining target branch
  * 2. Handling uncommitted changes
  * 3. Optimizing existing commit messages
  * 4. Creating and pushing a PR with AI-generated content
@@ -143,7 +143,7 @@ async function getUpstreamBranch(git: SimpleGit): Promise<string> {
       throw new Error('No remote branches found')
     }
 
-    // Ask user which branch to target
+    // Ask a user which branch to target
     const targetBranch = await logger.prompt(yellow('Select target branch for PR:'), {
       type: 'select',
       options: branches,
@@ -200,7 +200,7 @@ async function handleUncommittedChanges(git: SimpleGit, status: StatusResult) {
   const tempModified = [] as string[]
   for (const file of modifiedFiles) {
     logger.info(yellow(`Analyzing changes in: ${file}`))
-    const diff = await git.diff([file])
+    const diff = await git.diff(['--cached', file])
     tempModified.push(`
 filename: ${file}
 diff changes: ${diff}
@@ -262,11 +262,16 @@ and the following structure:
       await git.add('.')
 
       logger.info(yellow('Creating commit with the suggested message...'))
-      const commitResult = await git.commit(commitData.commitMessage)
-
-      // Mark this commit as created by pr-agent using git notes
-      if (commitResult.commit) {
-        await markCommitAsCreatedByTool(git, commitResult.commit)
+      try {
+        const commitResult = await git.commit(commitData.commitMessage)
+        // Mark this commit as created by pr-agent using git notes
+        if (commitResult.commit) {
+          await markCommitAsCreatedByTool(git, commitResult.commit)
+        }
+      } catch (error) {
+        logger.error(red('Failed to create commit'))
+        logger.debug('Error details:', error)
+        throw new Error('Commit creation failed')
       }
 
       logger.success(green('Changes committed successfully!'))
@@ -309,7 +314,7 @@ async function markCommitAsCreatedByTool(git: SimpleGit, commitHash: string) {
  *
  * @param git - SimpleGit instance
  * @param commitHash - Hash of the commit to check
- * @returns Promise resolving to boolean indicating if commit was created by tool
+ * @returns Promise resolving to boolean indicating if tool created commit
  */
 async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promise<boolean> {
   try {
@@ -322,10 +327,11 @@ async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promis
 }
 
 /**
- * Optimizes commit messages for all commits between current HEAD and upstream branch
+ * Optimizes commit messages for the last commit while using the full diff context
+ * from upstream branch to HEAD for better analysis.
  *
- * Uses AI to analyze each commit and suggest better commit messages that follow
- * conventional commit format. Skips merge commits and commits already created by this tool.
+ * Uses AI to analyze the comprehensive changes and suggest a better commit message
+ * that follows a conventional commit format. Only amends the last commit.
  *
  * @param git - SimpleGit instance
  * @param upstreamBranch - Name of the upstream branch
@@ -334,7 +340,7 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
   logger.info(yellow('Starting commit message optimization process...'))
 
   // Get all commits between current HEAD and upstream branch
-  logger.info(yellow('Fetching commits to optimize...'))
+  logger.info(yellow('Fetching commits information...'))
   const commits = await git.log({
     from: upstreamBranch,
     to: 'HEAD',
@@ -345,35 +351,31 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     return
   }
 
-  logger.info(green(`Found ${commits.all.length} commit(s) to optimize`))
+  logger.info(green(`Found ${commits.all.length} commit(s) in the branch`))
 
-  // Show all commits that will be processed
-  logger.info(yellow('The following commits will be analyzed for optimization:'))
-
-  // Process commits in reverse order (oldest first)
-  let commitsToProcess = [...commits.all].reverse()
-
-  // Filter out commits created by PR Agent before entering the loop
-  logger.info(yellow('Filtering out commits created by PR Agent...'))
-  const filteredCommits = []
-  for (const commit of commitsToProcess) {
-    // Check if the commit was created by this tool
-    const isToolCommit = await isCommitCreatedByTool(git, commit.hash)
-    if (isToolCommit) {
-      logger.info(yellow(`Skipping commit created by PR Agent: ${commit.hash.substring(0, 7)} - ${commit.message}`))
-      continue
-    }
-    filteredCommits.push(commit)
+  // Only focus on the last commit for optimization
+  const lastCommit = commits?.all?.[0]
+  if (!lastCommit) {
+    logger.info(yellow('No commits found to optimize'))
+    return
   }
 
-  commitsToProcess = filteredCommits
+  // Check if the last commit was created by this tool
+  const isToolCommit = await isCommitCreatedByTool(git, lastCommit.hash)
+  if (isToolCommit) {
+    logger.info(yellow(`Last commit was already created by PR Agent, skipping optimization`))
+    return
+  }
 
-  commitsToProcess.forEach((commit, index) => {
-    logger.info(`${index + 1}. ${commit.hash.substring(0, 7)} - ${commit.message}`)
-  })
+  logger.info(yellow(`Will optimize the last commit: ${lastCommit.hash.substring(0, 7)} - ${lastCommit.message}`))
 
-  if (commitsToProcess.length === 0) {
-    logger.info(yellow('No commits to optimize after filtering'))
+  // Check if this is a merge commit (has multiple parents)
+  const revList = await git.raw(['rev-list', '--parents', '-n', '1', lastCommit.hash])
+  const parentHashes = revList.trim().split(' ')
+
+  // If there are more than 2 entries (commit hash + parent hashes), it's a merge commit
+  if (parentHashes.length > 2) {
+    logger.info(yellow(`Cannot optimize merge commit: ${lastCommit.hash.substring(0, 7)}`))
     return
   }
 
@@ -386,39 +388,43 @@ async function optimizeCommitMessages(git: SimpleGit, upstreamBranch: string) {
     return
   }
 
-  // Process commits in reverse order (oldest first)
-  for (const commit of commitsToProcess) {
-    // Check if this is a merge commit (has multiple parents)
-    const revList = await git.raw(['rev-list', '--parents', '-n', '1', commit.hash])
-    const parentHashes = revList.trim().split(' ')
+  // Get the comprehensive diff from upstream branch to HEAD
+  logger.info(yellow(`Getting full diff context from ${upstreamBranch} to HEAD for better analysis...`))
+  const fullDiff = await git.diff([
+    upstreamBranch,
+    'HEAD',
+    ...ignoredFiles.map((file) => `:(exclude)${file}`),
+    ':(exclude)*.generated.*',
+    ':(exclude)*.lock',
+    ':(exclude)tsconfig.json',
+    ':(exclude)tsconfig.*.json',
+    ':(exclude)*.svg',
+    ':(exclude)*.png',
+    ':(exclude)*.jpg',
+    ':(exclude)*.jpeg',
+  ])
 
-    // If there are more than 2 entries (commit hash + parent hashes), it's a merge commit
-    if (parentHashes.length > 2) {
-      logger.info(yellow(`Skipping merge commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
-      continue
-    }
+  // Get the individual commit diff as well
+  logger.info(yellow(`Also analyzing the specific commit: ${lastCommit.hash.substring(0, 7)}`))
+  const commitDiff = await git.show([
+    lastCommit.hash,
+    ...ignoredFiles.map((file) => `:(exclude)${file}`),
+    ':(exclude)*.generated.*',
+    ':(exclude)*.lock',
+    ':(exclude)tsconfig.json',
+    ':(exclude)tsconfig.*.json',
+    ':(exclude)*.svg',
+    ':(exclude)*.png',
+    ':(exclude)*.jpg',
+    ':(exclude)*.jpeg',
+  ])
 
-    // Get commit diff
-    logger.info(yellow(`Analyzing commit: ${commit.hash.substring(0, 7)} - ${commit.message}`))
-    // ignore specific files that don't add value to the analysis
-    const diff = await git.show([
-      commit.hash,
-      ...ignoredFiles.map((file) => `:(exclude)${file}`),
-      ':(exclude)*.generated.*',
-      ':(exclude)*.lock',
-      ':(exclude)tsconfig.json',
-      ':(exclude)tsconfig.*.json',
-      ':(exclude)*.svg',
-      ':(exclude)*.png',
-      ':(exclude)*.jpg',
-      ':(exclude)*.jpeg',
-    ])
-
-    const systemPrompt = `
+  const systemPrompt = `
 ${getSystemPrompt()}
 
-First, analyze the commit message and determine if it needs improvement based on conventional commit best practices.
-Then, if it needs improvement, provide a better commit message that clearly describes the change using the conventional commit format 
+First, analyze the current commit message and determine if it needs improvement based on conventional commit best practices.
+Then, analyze both the full branch diff and the specific commit diff to get complete context about the changes.
+If the commit needs improvement, provide a better commit message that clearly describes the change using the conventional commit format 
 (type(scope): description). Types include: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
 The message should be concise, clear, and follow best practices.
 
@@ -432,74 +438,66 @@ Format your response as a JSON object with the following structure:
 The "improvedCommitMessage" should only be provided if "needsImprovement" is true, and should be max 120 characters.
 `
 
-    // Ask LLM for a better commit message
-    const promptMsg = `
-Current commit message: "${commit.message}"
+  // Ask LLM for a better commit message
+  const promptMsg = `
+Current commit message: "${lastCommit.message}"
 
-Commit diff:
-${diff}
+Specific commit diff:
+${commitDiff}
+
+Full branch context (all changes from upstream to HEAD):
+${fullDiff}
 `
 
-    logger.info(yellow(`Requesting commit message analysis from AI...`))
-    const res = await generateCompletion('ollama', {
-      prompt: `${systemPrompt}${promptMsg}`,
-    })
+  logger.info(yellow(`Requesting commit message analysis from AI with comprehensive context...`))
+  const res = await generateCompletion('ollama', {
+    prompt: `${systemPrompt}${promptMsg}`,
+  })
 
-    try {
-      const analysis = JSON.parse(res.text)
+  try {
+    const analysis = JSON.parse(res.text)
 
-      if (analysis.needsImprovement) {
-        logger.info(green(`AI suggests improving this commit message`))
-        logger.box({
-          title: 'Commit Message Comparison',
-          current: commit.message,
-          improved: analysis.improvedCommitMessage,
-          reason: analysis.reason,
-        })
+    if (analysis.needsImprovement) {
+      logger.info(green(`AI suggests improving the last commit message`))
+      logger.box({
+        title: 'Commit Message Comparison',
+        current: lastCommit.message,
+        improved: analysis.improvedCommitMessage,
+        reason: analysis.reason,
+      })
 
-        const amendConfirm = await logger.prompt(
-          green(`Amend commit ${commit.hash.substring(0, 7)} with the improved message?`),
-          {
-            type: 'confirm',
-          },
-        )
+      const amendConfirm = await logger.prompt(
+        green(`Amend commit ${lastCommit.hash.substring(0, 7)} with the improved message?`),
+        {
+          type: 'confirm',
+        },
+      )
 
-        if (amendConfirm) {
-          logger.info(green(`Amending commit ${commit.hash.substring(0, 7)}...`))
+      if (amendConfirm) {
+        logger.info(green(`Amending last commit ${lastCommit.hash.substring(0, 7)}...`))
 
-          // Reset to the parent of the commit to amend
-          await git.raw(['reset', '--soft', `${commit.hash}^`])
+        // Amend the last commit with the new message
+        await git.raw(['commit', '--amend', '-m', analysis.improvedCommitMessage])
 
-          // Re-commit the changes with the new message
-          const newCommit = await git.commit(analysis.improvedCommitMessage, ['--no-edit', '--allow-empty'])
+        // Mark the amended commit as created by our tool
+        await markCommitAsCreatedByTool(git, 'HEAD')
 
-          // Mark the new commit as created by our tool
-          if (newCommit.commit) {
-            await markCommitAsCreatedByTool(git, newCommit.commit)
-          }
-
-          logger.success(green(`Commit ${commit.hash.substring(0, 7)} amended successfully`))
-        } else {
-          logger.info(yellow(`Skipping amendment for commit ${commit.hash.substring(0, 7)}`))
-        }
+        logger.success(green(`Last commit amended successfully`))
       } else {
-        logger.info(yellow(`No changes needed for commit ${commit.hash.substring(0, 7)}: ${analysis.reason}`))
+        logger.info(yellow(`Skipping amendment for last commit`))
       }
-    } catch (e) {
-      logger.error(red(`Failed to optimize commit ${commit.hash.substring(0, 7)}`))
-      logger.debug('Raw response:', res)
+    } else {
+      logger.info(yellow(`No changes needed for last commit: ${analysis.reason}`))
     }
+  } catch (e) {
+    logger.error(red(`Failed to optimize last commit`))
+    logger.debug('Raw response:', res)
   }
 
-  // Log the list of commits and their messages after optimization
-  const updatedCommits = await git.log({
-    from: upstreamBranch,
-    to: 'HEAD',
-  })
-  logger.info(green('Updated list of commits after optimization:'))
-  updatedCommits.all.forEach((commit) => {
-    logger.info(`${commit.hash.substring(0, 7)} - ${commit.message}`)
-  })
+  // Log the updated commit message
+  const updatedCommit = await git.log(['-1'])
+  logger.info(green('Last commit after optimization:'))
+  logger.info(`${updatedCommit.latest?.hash.substring(0, 7)} - ${updatedCommit.latest?.message}`)
 
   logger.success(green('Commit message optimization complete'))
 }
