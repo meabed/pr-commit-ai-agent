@@ -13,7 +13,7 @@ Create a well-structured commit message following conventional commit format:
 ## 2. Pull Request Title
 - Create a clear, descriptive PR title (60-100 characters)
 - Begin with appropriate type prefix (same as commit convention)
-- Focus on the main purpose of the changes
+- Focus on the main purpose of the changes and avoid vague terms and add summary details
 - Include scope if applicable (e.g., "feat(auth): Implement OAuth2 authentication flow")
 
 ## 3. Pull Request Description
