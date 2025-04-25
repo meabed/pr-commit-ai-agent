@@ -1,4 +1,4 @@
-// get system prompt for llms ( e.g. ollama, gpt-3.5-turbo, gpt-4, etc.)
+// get system prompt for LLM ( e.g. ollama, gpt-3.5-turbo, gpt-4, etc.)
 export function getSystemPrompt() {
   return `You are a senior software architect and code review expert with extensive experience in version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
 
@@ -101,7 +101,7 @@ Based on file patterns and code change patterns, classify the change appropriate
   * Replace conditional with polymorphism
   * Introduce design pattern
 
-## 9. all generated content should be in the correct sentence case capitalization
+## 9. All generated content should be in the correct sentence case capitalization
 
 `
 }
