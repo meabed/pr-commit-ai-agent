@@ -11,11 +11,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { getSystemPrompt } from './prompts';
 import { tokenizeAndEstimateCost } from 'llm-cost';
 
-// Define supported LLM providers
+// Types and Interfaces
 export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama';
 
-// Interface for chat completion options
-interface CompletionOptions {
+export interface CompletionOptions {
   prompt: string;
   temperature?: number;
   maxTokens?: number;
@@ -23,7 +22,6 @@ interface CompletionOptions {
   logRequest?: boolean;
 }
 
-// Interface for log entry
 interface LLMLogEntry {
   id: string;
   timestamp: string;
@@ -33,248 +31,6 @@ interface LLMLogEntry {
   response?: string;
   error?: string;
   executionTimeMs?: number;
-}
-
-// Global clients
-let openaiClient: OpenAI | null = null;
-let anthropicClient: Anthropic | null = null;
-
-// Configuration
-const logDir = path.join(os.homedir(), '.llm-logs');
-
-// Initialize clients based on config
-function initializeClients() {
-  try {
-    if (config.openai?.apiKey) {
-      openaiClient = new OpenAI({
-        apiKey: config.openai.apiKey,
-        baseURL: config.openai.baseURL
-      });
-    }
-
-    if (config.anthropic?.apiKey) {
-      anthropicClient = new Anthropic({
-        apiKey: config.anthropic.apiKey
-      });
-    }
-  } catch (error) {
-    logger.error(red(`Failed to initialize LLM clients: ${(error as Error).message}`));
-  }
-}
-
-// Ensure log directory exists
-async function ensureLogDirectory() {
-  try {
-    await fs.mkdir(logDir, { recursive: true });
-  } catch (error) {
-    logger.error(red(`Failed to create log directory: ${(error as Error).message}`));
-  }
-}
-
-// Log request to file
-async function logRequest(logEntry: LLMLogEntry) {
-  try {
-    const logFileName = `llm-requests-${new Date().toISOString().split('T')[0]}.jsonl`;
-    const logFilePath = path.join(logDir, logFileName);
-
-    // Create a separate JSON file for this specific request for easy manual testing
-    const requestFileName = `request-${logEntry.id}.json`;
-    const requestFilePath = path.join(logDir, requestFileName);
-
-    // Log the full entry to the daily log file
-    await fs.appendFile(logFilePath, JSON.stringify(logEntry) + '\n', { encoding: 'utf8' });
-
-    // Save the request part separately in a structured JSON file for easy reuse
-    await fs.writeFile(requestFilePath, JSON.stringify(logEntry, null, 2), { encoding: 'utf8' });
-
-    logger.debug(`Logged LLM request to ${logFilePath}`);
-    logger.info(green(`Request saved as ${requestFilePath} (ID: ${logEntry.id})`));
-
-    return logEntry.id;
-  } catch (error) {
-    logger.error(red(`Failed to log LLM request: ${(error as Error).message}`));
-    return logEntry.id;
-  }
-}
-
-// Get the appropriate model for the provider
-const getModelForProvider = (provider: LLMProvider, customModel?: string): string => {
-  switch (provider) {
-    case 'openai':
-      return customModel || config.openai?.defaultModel || 'gpt-3.5-turbo';
-    case 'anthropic':
-      return customModel || config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
-    case 'deepseek':
-      return customModel || config.deepseek?.defaultModel || 'deepseek-chat';
-    case 'ollama':
-      return customModel || config.ollama?.defaultModel || 'llama2';
-    default:
-      return customModel || 'unknown';
-  }
-};
-
-// Provider-specific completion functions
-async function openaiGenerate(options: CompletionOptions): Promise<string> {
-  if (!openaiClient) {
-    throw new Error('OpenAI client not initialized. Check your API key.');
-  }
-
-  const model = options.model || config.openai?.defaultModel || 'gpt-3.5-turbo';
-
-  logger.info(yellow(`Making OpenAI completion request with model: ${model}`));
-  // Log the token count and cost before the request
-  const inputToken = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt
-  });
-  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
-  logger.debug(
-    `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
-  );
-
-  const response = await openaiClient.responses.create({
-    model,
-    input: [
-      {
-        role: 'user',
-        content: options.prompt,
-        type: 'message'
-      }
-    ],
-    temperature: options.temperature || 0.1
-  });
-  const inputOutputCost = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt,
-    output: response.output_text
-  });
-  logger.info(
-    yellow(
-      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
-    )
-  );
-
-  return response.output_text || '';
-}
-
-async function anthropicGenerate(options: CompletionOptions): Promise<string> {
-  if (!anthropicClient) {
-    throw new Error('Anthropic client not initialized. Check your API key.');
-  }
-
-  const model = options.model || config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
-
-  logger.info(yellow(`Making Anthropic completion request with model: ${model}`));
-  // Log the token count and cost before the request
-  const inputToken = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt
-  });
-  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
-  logger.debug(
-    `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
-  );
-  logger.debug(
-    `Anthropic request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
-  );
-
-  const messages = [
-    {
-      role: 'user',
-      content: options.prompt
-    }
-  ] as MessageParam[];
-
-  const response = await anthropicClient.messages.create({
-    model,
-    messages,
-    temperature: options.temperature || 0.1,
-    max_tokens: options.maxTokens || 1000000,
-    thinking: {
-      type: 'disabled'
-    }
-  });
-
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error
-  const responseText = response.content[0]?.text || '';
-
-  const inputOutputCost = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt,
-    output: responseText
-  });
-  logger.info(
-    yellow(
-      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
-    )
-  );
-
-  return responseText;
-}
-
-async function deepseekGenerate(options: CompletionOptions): Promise<string> {
-  if (!config.deepseek?.apiKey) {
-    throw new Error('DeepSeek API key not configured.');
-  }
-
-  const model = options.model || config.deepseek?.defaultModel || 'deepseek-chat';
-  const apiUrl = config.deepseek?.baseURL || 'https://api.deepseek.com/v1/chat/completions';
-
-  logger.info(yellow(`Making DeepSeek completion request with model: ${model}`));
-  // Log the token count and cost before the request
-  const inputToken = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt
-  });
-  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
-  logger.debug(
-    `DeepSeek request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}, url=${apiUrl}`
-  );
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.deepseek.apiKey}`
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: options.prompt
-        }
-      ],
-      temperature: options.temperature || 0.1,
-      max_tokens: options.maxTokens || 1000000
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.statusText}`);
-  }
-
-  const data = (await response.json()) as unknown as {
-    choices: {
-      message: {
-        content: string;
-      };
-    }[];
-  };
-  const responseText = data.choices[0]?.message?.content || '';
-  const inputOutputCost = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt,
-    output: responseText
-  });
-  logger.info(
-    yellow(
-      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
-    )
-  );
-
-  return responseText;
 }
 
 /**
@@ -338,63 +94,372 @@ type OllamaGenerateOptions = {
   num_thread?: number;
 };
 
+// Clients and configuration
+let openaiClient: OpenAI | null = null;
+let anthropicClient: Anthropic | null = null;
+const logDir = path.join(os.homedir(), '.llm-logs');
+
+/**
+ * Initialize LLM clients based on available API keys in config
+ */
+function initializeClients(): void {
+  try {
+    if (config.openai?.apiKey) {
+      openaiClient = new OpenAI({
+        apiKey: config.openai.apiKey,
+        baseURL: config.openai.baseURL
+      });
+      logger.debug('OpenAI client initialized successfully');
+    } else {
+      logger.debug('Skipping OpenAI client initialization: No API key provided');
+    }
+
+    if (config.anthropic?.apiKey) {
+      anthropicClient = new Anthropic({
+        apiKey: config.anthropic.apiKey
+      });
+      logger.debug('Anthropic client initialized successfully');
+    } else {
+      logger.debug('Skipping Anthropic client initialization: No API key provided');
+    }
+  } catch (error) {
+    logger.error(red(`Failed to initialize LLM clients: ${(error as Error).message}`));
+    throw new Error(`LLM client initialization failed: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Ensure the log directory exists for storing LLM request logs
+ */
+async function ensureLogDirectory(): Promise<void> {
+  try {
+    await fs.mkdir(logDir, { recursive: true });
+    logger.debug(`LLM log directory ensured at: ${logDir}`);
+  } catch (error) {
+    logger.error(red(`Failed to create log directory: ${(error as Error).message}`));
+    throw new Error(`Log directory creation failed: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Log an LLM request to a file system for later reference
+ *
+ * @param logEntry The log entry to write
+ * @returns The request ID of the logged entry
+ */
+async function logRequest(logEntry: LLMLogEntry): Promise<string> {
+  try {
+    const logFileName = `llm-requests-${new Date().toISOString().split('T')[0]}.jsonl`;
+    const logFilePath = path.join(logDir, logFileName);
+
+    // Create a separate JSON file for this specific request for easy manual testing
+    const requestFileName = `request-${logEntry.id}.json`;
+    const requestFilePath = path.join(logDir, requestFileName);
+
+    // Log the full entry to the daily log file
+    await fs.appendFile(logFilePath, JSON.stringify(logEntry) + '\n', { encoding: 'utf8' });
+
+    // Save the request part separately in a structured JSON file for easy reuse
+    await fs.writeFile(requestFilePath, JSON.stringify(logEntry, null, 2), { encoding: 'utf8' });
+
+    logger.debug(`Logged LLM request to ${logFilePath}`);
+    logger.info(green(`Request saved as ${requestFilePath} (ID: ${logEntry.id})`));
+
+    return logEntry.id;
+  } catch (error) {
+    logger.error(red(`Failed to log LLM request: ${(error as Error).message}`));
+    return logEntry.id;
+  }
+}
+
+/**
+ * Get the default model for a specific LLM provider
+ *
+ * @param provider The LLM provider
+ * @param customModel Optional custom model to override the default
+ * @returns The model name to use
+ */
+function getModelForProvider(provider: LLMProvider, customModel?: string): string {
+  if (customModel) return customModel;
+
+  switch (provider) {
+    case 'openai':
+      return config.openai?.defaultModel || 'gpt-3.5-turbo';
+    case 'anthropic':
+      return config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
+    case 'deepseek':
+      return config.deepseek?.defaultModel || 'deepseek-chat';
+    case 'ollama':
+      return config.ollama?.defaultModel || 'llama2';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * Log token count and estimated cost information
+ *
+ * @param model The model being used
+ * @param input The input prompt
+ * @param output Optional output text
+ */
+async function logTokensAndCost(model: string, input: string, output?: string): Promise<void> {
+  try {
+    // If output is provided, log combined input/output tokens and cost
+    if (output) {
+      const inputOutputCost = await tokenizeAndEstimateCost({
+        model,
+        input,
+        output
+      });
+
+      logger.info(
+        yellow(
+          `Input tokens: ${inputOutputCost.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+        )
+      );
+      return;
+    }
+    // Log input tokens
+    const inputToken = await tokenizeAndEstimateCost({
+      model,
+      input
+    });
+    logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
+  } catch (error) {
+    logger.warn(yellow(`Failed to calculate token usage: ${(error as Error).message}`));
+  }
+}
+
+/**
+ * Generate a completion using OpenAI
+ */
+async function openaiGenerate(options: CompletionOptions): Promise<string> {
+  if (!openaiClient) {
+    throw new Error('OpenAI client not initialized. Check your API key.');
+  }
+
+  const model = options.model || config.openai?.defaultModel || 'gpt-3.5-turbo';
+  logger.info(yellow(`Making OpenAI completion request with model: ${model}`));
+
+  // Log input tokens
+  await logTokensAndCost(model, options.prompt);
+
+  logger.debug(
+    `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
+  );
+
+  try {
+    const response = await openaiClient.responses.create({
+      model,
+      input: [
+        {
+          role: 'user',
+          content: options.prompt,
+          type: 'message'
+        }
+      ],
+      temperature: options.temperature || 0.1
+    });
+
+    const outputText = response.output_text || '';
+
+    // Log combined input/output tokens and cost
+    await logTokensAndCost(model, options.prompt, outputText);
+
+    return outputText;
+  } catch (error) {
+    throw new Error(`OpenAI API error: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Generate a completion using Anthropic
+ */
+async function anthropicGenerate(options: CompletionOptions): Promise<string> {
+  if (!anthropicClient) {
+    throw new Error('Anthropic client not initialized. Check your API key.');
+  }
+
+  const model = options.model || config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
+  logger.info(yellow(`Making Anthropic completion request with model: ${model}`));
+
+  // Log input tokens
+  await logTokensAndCost(model, options.prompt);
+
+  logger.debug(
+    `Anthropic request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
+  );
+
+  try {
+    const messages = [
+      {
+        role: 'user',
+        content: options.prompt
+      }
+    ] as MessageParam[];
+
+    const response = await anthropicClient.messages.create({
+      model,
+      messages,
+      temperature: options.temperature || 0.1,
+      max_tokens: options.maxTokens || 1000000,
+      thinking: {
+        type: 'disabled'
+      }
+    });
+
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    const responseText = response.content[0]?.text || '';
+
+    // Log combined input/output tokens and cost
+    await logTokensAndCost(model, options.prompt, responseText);
+
+    return responseText;
+  } catch (error) {
+    throw new Error(`Anthropic API error: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Generate a completion using DeepSeek
+ */
+async function deepseekGenerate(options: CompletionOptions): Promise<string> {
+  if (!config.deepseek?.apiKey) {
+    throw new Error('DeepSeek API key not configured.');
+  }
+
+  const model = options.model || config.deepseek?.defaultModel || 'deepseek-chat';
+  const apiUrl = config.deepseek?.baseURL || 'https://api.deepseek.com/v1/chat/completions';
+
+  logger.info(yellow(`Making DeepSeek completion request with model: ${model}`));
+
+  // Log input tokens
+  await logTokensAndCost(model, options.prompt);
+
+  logger.debug(
+    `DeepSeek request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}, url=${apiUrl}`
+  );
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.deepseek.apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: options.prompt
+          }
+        ],
+        temperature: options.temperature || 0.1,
+        max_tokens: options.maxTokens || 1000000
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as unknown as {
+      choices: {
+        message: {
+          content: string;
+        };
+      }[];
+    };
+
+    if (!data || !data.choices || !data.choices[0]?.message) {
+      throw new Error('Invalid response format from DeepSeek API');
+    }
+
+    const responseText = data.choices[0].message.content || '';
+
+    // Log combined input/output tokens and cost
+    await logTokensAndCost(model, options.prompt, responseText);
+
+    return responseText;
+  } catch (error) {
+    throw new Error(`DeepSeek API error: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Generate a completion using Ollama
+ */
 async function ollamaGenerate(options: CompletionOptions): Promise<string> {
   const model = options.model || config.ollama?.defaultModel || 'llama2';
   const apiUrl = config.ollama?.baseURL || 'http://localhost:11434/api/generate';
 
   logger.info(yellow(`Making Ollama completion request with model: ${model}`));
-  // Log the token count and cost before the request
-  const inputToken = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt
-  });
-  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
+
+  // Log input tokens
+  await logTokensAndCost(model, options.prompt);
+
   logger.debug(`Ollama request params: temperature=${options.temperature || 0.1}, url=${apiUrl}`);
-  const body = JSON.stringify({
-    model,
-    stream: false,
-    prompt: options.prompt,
-    format: 'json',
-    system: getSystemPrompt(),
-    options: {
-      temperature: options.temperature || 0.1, // I don't want entropy injected into my code
-      num_ctx: 32768, // More useful default
-      // num_batch: 1024, // Faster, but more vRAM
-      top_p: 0.8 // Quality
-    } as OllamaGenerateOptions
-  });
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.ollama.apiKey}`
-    },
-    body
-  });
 
-  if (!response.ok) {
-    throw new Error(`Ollama API error: ${response.statusText}`);
+  try {
+    const body = JSON.stringify({
+      model,
+      stream: false,
+      prompt: options.prompt,
+      format: 'json',
+      system: getSystemPrompt(),
+      options: {
+        temperature: options.temperature || 0.1,
+        num_ctx: 32768,
+        top_p: 0.8
+      } as OllamaGenerateOptions
+    });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    // Add authorization header if API key is configured
+    if (config.ollama?.apiKey) {
+      headers.Authorization = `Bearer ${config.ollama.apiKey}`;
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as unknown as { response?: string };
+
+    if (!data || typeof data !== 'object' || !('response' in data)) {
+      throw new Error('Invalid response format from Ollama API');
+    }
+
+    const responseText = data.response || '';
+
+    // Log combined input/output tokens and cost
+    await logTokensAndCost(model, options.prompt, responseText);
+
+    return responseText;
+  } catch (error) {
+    throw new Error(`Ollama API error: ${(error as Error).message}`);
   }
-
-  const data = (await response.json()) as unknown as {
-    response: string;
-  };
-  const responseText = data.response || '';
-  const inputOutputCost = await tokenizeAndEstimateCost({
-    model,
-    input: options.prompt,
-    output: responseText
-  });
-  logger.info(
-    yellow(
-      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
-    )
-  );
-
-  return responseText;
 }
 
-// Main completion function
+/**
+ * Main completion function to generate text from any supported LLM provider
+ *
+ * @param provider The LLM provider to use
+ * @param options Completion options including prompt, temperature, etc.
+ * @returns The generated text and a unique request ID
+ */
 export const generateCompletion = async (
   provider: LLMProvider,
   options: CompletionOptions
@@ -407,7 +472,9 @@ export const generateCompletion = async (
   }
 
   // Ensure log directory exists
-  await ensureLogDirectory();
+  await ensureLogDirectory().catch((err) => {
+    logger.warn(yellow(`Failed to ensure log directory, but will continue: ${err.message}`));
+  });
 
   const startTime = Date.now();
   const model = getModelForProvider(provider, options.model);
@@ -418,7 +485,7 @@ export const generateCompletion = async (
     timestamp: new Date().toISOString(),
     provider,
     model,
-    options
+    options: { ...options }
   };
 
   try {
@@ -445,9 +512,11 @@ export const generateCompletion = async (
     logEntry.response = response;
     logEntry.executionTimeMs = Date.now() - startTime;
 
-    // Only log the request if the logRequest option is not explicitly false
+    // Only log the request if the logRequest option is true
     if (options.logRequest) {
-      await logRequest(logEntry);
+      await logRequest(logEntry).catch((err) => {
+        logger.warn(yellow(`Failed to log request, but will continue: ${err.message}`));
+      });
     }
 
     return { text: response, requestId };
@@ -456,9 +525,11 @@ export const generateCompletion = async (
     logEntry.error = (error as Error).message;
     logEntry.executionTimeMs = Date.now() - startTime;
 
-    // Only log the error if the logRequest option is not explicitly false
+    // Only log the error if the logRequest option is true
     if (options.logRequest) {
-      await logRequest(logEntry);
+      await logRequest(logEntry).catch((err) => {
+        logger.warn(yellow(`Failed to log error request, but will continue: ${err.message}`));
+      });
     }
 
     logger.error(red(`Error generating completion with ${provider}: ${(error as Error).message}`));
@@ -468,4 +539,4 @@ export const generateCompletion = async (
 
 // Initialize on module load
 initializeClients();
-ensureLogDirectory().catch((err) => logger.error(err));
+ensureLogDirectory().catch((err) => logger.error(red(`Log directory initialization error: ${err.message}`)));
