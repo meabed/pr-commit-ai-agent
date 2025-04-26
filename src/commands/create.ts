@@ -352,7 +352,7 @@ ____________=========================____________
     return;
   }
 
-  const systemPrompt = `
+  const commitPrompt = `
 
 Extra Instructions:
 - Provide a better commit message that clearly describes the change using the conventional commit format
@@ -365,14 +365,15 @@ and the following structure:
 {
   "commitMessage": "type(scope): summary of changes detailed explanation of changes..."
 }
+    Git diff changes are as follows:
+    ${tempModified.join('')}
+
 `;
 
   logger.info(green('Sending changes to LLM for commit suggestion...'));
   const res = await generateCompletion('ollama', {
     logRequest: globalLogRequest,
-    prompt: `${systemPrompt}
-    Git diff changes are as follows:
-    ${tempModified.join('')}`
+    prompt: commitPrompt
   });
 
   let commitData: { commitMessage: string };
@@ -638,7 +639,7 @@ async function optimizeCommitMessages(
     commitDiff = 'Failed to retrieve specific commit diff';
   }
 
-  const systemPrompt = `
+  const promptMsg = `
 
 First, analyze the current commit message and determine if it needs improvement based on conventional commit best practices.
 Then, analyze both the full branch diff and the specific commit diff to get complete context about the changes.
@@ -654,10 +655,7 @@ Format your response as a JSON object with the following structure:
 }
 
 The "improvedCommitMessage" should only be provided if "needsImprovement" is true, and should be max 120 characters.
-`;
 
-  // Ask LLM for a better commit message
-  const promptMsg = `
 Current commit message: "${lastCommit.message}"
 
 Specific commit diff:
@@ -670,7 +668,7 @@ ${fullDiff}
   logger.info(yellow(`Requesting commit message analysis from AI with comprehensive context...`));
   const res = await generateCompletion('ollama', {
     logRequest: globalLogRequest,
-    prompt: `${systemPrompt}${promptMsg}`
+    prompt: promptMsg
   });
 
   try {
@@ -825,9 +823,15 @@ async function createAndPushPR(
     ? existingBranches.all.map((branch) => branch?.trim()).join(', ')
     : '';
 
-  const systemPrompt = `
+  let fullDiff = '';
+  try {
+    fullDiff = await git.diff([upstreamBranch, 'HEAD']);
+  } catch (error) {
+    logger.warn(yellow(`Failed to get full diff for PR suggestion: ${(error as Error).message}`));
+  }
 
-Exclude the following branches from suggestions: ${existingBranchNames}
+  const prPrompt = `
+  Exclude the following branches from suggestions: ${existingBranchNames}
 Format your response as a JSON object with the following length and structure:
 - suggestedBranchName: max 50 characters
 - prTitle: max 100 characters
@@ -838,17 +842,19 @@ and the following structure:
   "prTitle": "type(scope): PR Title",
   "prDescription": "## Summary\\n[Comprehensive description of the changes]"
 }
-`;
 
-  const prPrompt = `
 Based on this commit message, suggest a branch name, PR title and description for a pull request:
 
+
 Commit message: ${commitMessage}
+
+Full diff from ${upstreamBranch} to HEAD:
+${fullDiff}
 `;
 
   const res = await generateCompletion('ollama', {
     logRequest: globalLogRequest,
-    prompt: `${systemPrompt}${prPrompt}`
+    prompt: prPrompt
   });
 
   let prData;
