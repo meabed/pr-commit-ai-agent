@@ -56,6 +56,7 @@
     "conf": "^13.1.0",
     "consola": "3.4.2",
     "dotenv": "16.5.0",
+    "execa": "^9.5.2",
     "giget": "2.0.0",
     "llm-cost": "^1.0.5",
     "ollama-ai-provider": "1.2.0",
