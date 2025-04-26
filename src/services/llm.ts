@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { v4 as uuidv4 } from 'uuid';
 import { getSystemPrompt } from './prompts';
+import { tokenizeAndEstimateCost } from 'llm-cost';
 
 // Define supported LLM providers
 export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama';
@@ -121,6 +122,12 @@ async function openaiGenerate(options: CompletionOptions): Promise<string> {
   const model = options.model || config.openai?.defaultModel || 'gpt-3.5-turbo';
 
   logger.info(yellow(`Making OpenAI completion request with model: ${model}`));
+  // Log the token count and cost before the request
+  const inputToken = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt
+  });
+  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
   logger.debug(
     `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
   );
@@ -136,6 +143,16 @@ async function openaiGenerate(options: CompletionOptions): Promise<string> {
     ],
     temperature: options.temperature || 0.1
   });
+  const inputOutputCost = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt,
+    output: response.output_text
+  });
+  logger.info(
+    yellow(
+      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+    )
+  );
 
   return response.output_text || '';
 }
@@ -148,6 +165,15 @@ async function anthropicGenerate(options: CompletionOptions): Promise<string> {
   const model = options.model || config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
 
   logger.info(yellow(`Making Anthropic completion request with model: ${model}`));
+  // Log the token count and cost before the request
+  const inputToken = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt
+  });
+  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
+  logger.debug(
+    `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
+  );
   logger.debug(
     `Anthropic request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
   );
@@ -171,7 +197,20 @@ async function anthropicGenerate(options: CompletionOptions): Promise<string> {
 
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-expect-error
-  return response.content[0]?.text || '';
+  const responseText = response.content[0]?.text || '';
+
+  const inputOutputCost = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt,
+    output: responseText
+  });
+  logger.info(
+    yellow(
+      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+    )
+  );
+
+  return responseText;
 }
 
 async function deepseekGenerate(options: CompletionOptions): Promise<string> {
@@ -183,6 +222,12 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
   const apiUrl = config.deepseek?.baseURL || 'https://api.deepseek.com/v1/chat/completions';
 
   logger.info(yellow(`Making DeepSeek completion request with model: ${model}`));
+  // Log the token count and cost before the request
+  const inputToken = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt
+  });
+  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
   logger.debug(
     `DeepSeek request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}, url=${apiUrl}`
   );
@@ -217,7 +262,19 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
       };
     }[];
   };
-  return data.choices[0]?.message?.content || '';
+  const responseText = data.choices[0]?.message?.content || '';
+  const inputOutputCost = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt,
+    output: responseText
+  });
+  logger.info(
+    yellow(
+      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+    )
+  );
+
+  return responseText;
 }
 
 /**
@@ -286,6 +343,12 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
   const apiUrl = config.ollama?.baseURL || 'http://localhost:11434/api/generate';
 
   logger.info(yellow(`Making Ollama completion request with model: ${model}`));
+  // Log the token count and cost before the request
+  const inputToken = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt
+  });
+  logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
   logger.debug(`Ollama request params: temperature=${options.temperature || 0.1}, url=${apiUrl}`);
   const body = JSON.stringify({
     model,
@@ -316,7 +379,19 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
   const data = (await response.json()) as unknown as {
     response: string;
   };
-  return data?.response || '';
+  const responseText = data.response || '';
+  const inputOutputCost = await tokenizeAndEstimateCost({
+    model,
+    input: options.prompt,
+    output: responseText
+  });
+  logger.info(
+    yellow(
+      `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+    )
+  );
+
+  return responseText;
 }
 
 // Main completion function
