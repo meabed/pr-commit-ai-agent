@@ -664,6 +664,7 @@ ${fullDiff}
 
   logger.info(yellow(`Requesting commit message analysis from AI with comprehensive context...`));
   const res = await generateCompletion('ollama', {
+    logRequest: globalLogRequest,
     prompt: `${systemPrompt}${promptMsg}`
   });
 
@@ -839,6 +840,7 @@ Commit message: ${commitMessage}
 `;
 
   const res = await generateCompletion('ollama', {
+    logRequest: globalLogRequest,
     prompt: `${systemPrompt}${prPrompt}`
   });
 
