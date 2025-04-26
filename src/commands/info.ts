@@ -2,6 +2,7 @@ import { ArgumentsCamelCase, Argv } from 'yargs';
 import { logger } from '../logger';
 import * as process from 'node:process';
 import { blue, bold, gray, green, red, yellow } from 'picocolors';
+import { configInstance } from '../config';
 
 interface InfoArgv {
   full?: boolean;
@@ -29,4 +30,5 @@ export async function handler(argv: ArgumentsCamelCase<InfoArgv>) {
   if (argv.full) {
     logger.box(gray(bold('Process config:')), process.config);
   }
+  logger.info(`Config path: ${configInstance.path}`);
 }
