@@ -73,7 +73,7 @@ const schema = {
 };
 
 // Create config instance with schema validation
-const configInstance = new Conf({
+export const configInstance = new Conf({
   projectName: 'pr-commit-ai-agent',
   schema
 });
@@ -138,6 +138,3 @@ export const config = {
     defaultModel: configInstance.get('ollama.defaultModel') as string
   }
 };
-
-// Export the config instance for direct access if needed
-export const configStore = configInstance;

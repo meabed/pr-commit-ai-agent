@@ -1,7 +1,5 @@
 /**
- * Push Command Module
- *
- * This module implements the 'push' command which helps users create AI-assisted
+ * This module implements the 'create' command which helps users create AI-assisted
  * pull requests. It provides functionality for optimizing commit messages,
  * creating branch names, generating PR titles and descriptions using AI.
  *
@@ -19,22 +17,22 @@ import { generateCompletion } from '../services/llm';
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { PromptOptions } from 'consola';
 
-export const command = 'push';
-export const describe = 'Create PR and push to remote';
+export const command = 'create';
+export const describe = 'Generate commit messages and create a PR using AI';
 export const aliases = ['c'];
 
-interface PushArgv {
+interface CreateArgv {
   yes?: boolean;
   'log-request'?: boolean;
 }
 
 /**
- * Configure command line arguments for the push command
+ * Configure command line arguments for the create command
  *
  * @param yargs - Yargs instance
- * @returns Configured yargs instance with push command options
+ * @returns Configured yargs instance with create command options
  */
-export function builder(yargs: Argv): Argv<PushArgv> {
+export function builder(yargs: Argv): Argv<CreateArgv> {
   return yargs
     .option('yes', {
       type: 'boolean',
@@ -54,7 +52,7 @@ let globalConfirm: (message: string, options?: PromptOptions) => Promise<unknown
 let globalLogRequest: boolean = false;
 
 // Initialize global variables
-export function initializeGlobals(argv: ArgumentsCamelCase<PushArgv>) {
+export function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
   globalConfirm = async (message: string, options: PromptOptions = { type: 'confirm' }) => {
     if (argv.yes) {
       logger.info(yellow(`[Auto-confirmed] ${message}`));
@@ -77,7 +75,7 @@ async function performGitOperation<T>(operation: () => Promise<T>, errorMessage:
 }
 
 /**
- * Main handler for the push command - implements the workflow for creating an AI-assisted PR
+ * Main handler for the create command - implements the workflow for creating an AI-assisted PR
  *
  * Guides the user through a series of steps to prepare and create a high-quality PR:
  * - Identifies the target branch
@@ -88,7 +86,7 @@ async function performGitOperation<T>(operation: () => Promise<T>, errorMessage:
  * Each step requires user confirmation before proceeding, allowing the user to
  * cancel or skip steps as desired.
  */
-export async function handler(argv: ArgumentsCamelCase<PushArgv>) {
+export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
   initializeGlobals(argv);
 
   const ready = await globalConfirm(`Are you ready to create an AI PR?`);

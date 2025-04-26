@@ -1,4 +1,4 @@
 import * as info from './info';
-import * as push from './push';
+import * as create from './create';
 
-export const commands = [info, push];
+export const commands = [info, create];
