@@ -27,10 +27,10 @@ Generate a comprehensive PR description including:
   * Command-line interface changes (new commands, modified parameters, etc.)
   * Changes to input/output handling
   * Performance considerations for CLI operations
-- Potential risks and mitigations
-- Testing approach: How the changes were tested
-- Migration instructions if applicable (e.g., configuration format changes)
-- Documentation updates required (man pages, help text, README)
+- Potential risks and mitigations if needed
+- Testing approach: How the changes were tested if needed
+- Migration instructions if applicable (e.g., configuration format changes) if needed
+- Documentation updates required (man pages, help text, README) if needed
 
 ## 4. Analysis Guidelines
 - Identify change patterns (e.g., consistent variable renaming across files suggests intentional refactoring)
