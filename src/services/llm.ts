@@ -205,13 +205,6 @@ function getModelForProvider(provider: LLMProvider, customModel?: string): strin
  */
 async function logTokensAndCost(model: string, input: string, output?: string): Promise<void> {
   try {
-    // Log input tokens
-    const inputToken = await tokenizeAndEstimateCost({
-      model,
-      input
-    });
-    logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
-
     // If output is provided, log combined input/output tokens and cost
     if (output) {
       const inputOutputCost = await tokenizeAndEstimateCost({
@@ -222,10 +215,17 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
 
       logger.info(
         yellow(
-          `Input tokens: ${inputToken.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+          `Input tokens: ${inputOutputCost.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
         )
       );
+      return;
     }
+    // Log input tokens
+    const inputToken = await tokenizeAndEstimateCost({
+      model,
+      input
+    });
+    logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
   } catch (error) {
     logger.warn(yellow(`Failed to calculate token usage: ${(error as Error).message}`));
   }
