@@ -946,7 +946,8 @@ Branch name: ${prData.suggestedBranchName}
 
           logger.info(yellow('Creating PR using GitHub CLI...'));
           try {
-            await execa('gh', [
+            // Capture the output from gh pr create command
+            const { stdout } = await execa('gh', [
               'pr',
               'create',
               '--title',
@@ -957,7 +958,15 @@ Branch name: ${prData.suggestedBranchName}
               upstreamTarget
             ]);
 
+            // Extract PR URL from output or get it using gh pr view
+            let prUrl = stdout.trim();
+            if (!prUrl.includes('http')) {
+              const { stdout: viewOutput } = await execa('gh', ['pr', 'view', '--json', 'url', '--jq', '.url']);
+              prUrl = viewOutput.trim();
+            }
+
             logger.success(green('Pull request created successfully!'));
+            logger.info(green(`PR URL: ${prUrl}`));
           } catch (error) {
             // Provide manual instructions if GitHub CLI fails or is not available
             logger.warn(yellow(`Could not automatically create PR: ${(error as Error).message}`));
