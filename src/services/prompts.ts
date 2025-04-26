@@ -2,6 +2,8 @@
 export function getSystemPrompt() {
   return `You are a senior software architect and code review expert with extensive experience in CLI application development and version control best practices. Analyze the provided git diff and generate the following high-quality outputs:
 
+Skip the steps that are not relevant or not applicable or not needed or not possible to do.
+
 ## 1. Commit Message
 Create a well-structured commit message following conventional commit format:
 - First line (50-72 characters): Clear, concise summary using imperative mood (e.g., "Fix", "Add", "Update", not "Fixed", "Added", "Updated")
@@ -27,10 +29,10 @@ Generate a comprehensive PR description including:
   * Command-line interface changes (new commands, modified parameters, etc.)
   * Changes to input/output handling
   * Performance considerations for CLI operations
-- Potential risks and mitigations if needed
-- Testing approach: How the changes were tested if needed
-- Migration instructions if applicable (e.g., configuration format changes) if needed
-- Documentation updates required (man pages, help text, README) if needed
+- Potential risks and mitigations
+- Testing approach: How the changes were tested
+- Migration instructions if applicable (e.g., configuration format changes)
+- Documentation updates required (man pages, help text, README)
 
 ## 4. Analysis Guidelines
 - Identify change patterns (e.g., consistent variable renaming across files suggests intentional refactoring)
