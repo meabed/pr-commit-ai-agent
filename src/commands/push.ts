@@ -327,8 +327,8 @@ async function handleUncommittedChanges(
     if (!file) continue;
     logger.info(yellow(`Analyzing changes in: ${file}`));
     try {
-      const stagedDiff = await git.diff(['-U3', '--staged', file]);
-      const unstagedDiff = await git.diff(['-U3', file]);
+      const stagedDiff = await git.diff(['-U3', '--minimal', '--staged', file]);
+      const unstagedDiff = await git.diff(['-U3', '--minimal', file]);
       const diff = stagedDiff + unstagedDiff;
       tempModified.push(`
 filename: ${file}
@@ -386,10 +386,13 @@ and the following structure:
       throw new Error('Invalid LLM response format');
     }
     logger.info(green('Got commit suggestion:'));
-    logger.box({
-      title: 'Commit Message',
-      content: commitData.commitMessage
-    });
+    logger.info(`
+---------------------------
+Commit Message:
+
+${commitData.commitMessage}
+---------------------------
+`);
 
     const commitConfirm = await confirm('Proceed with this commit?');
 
@@ -587,6 +590,7 @@ async function optimizeCommitMessages(
   try {
     fullDiff = await git.diff([
       '-U3',
+      '--minimal',
       upstreamBranch,
       'HEAD',
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
@@ -614,6 +618,7 @@ async function optimizeCommitMessages(
   try {
     commitDiff = await git.show([
       '-U3',
+      '--minimal',
       lastCommit.hash,
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
       ':(exclude)*.generated.*',
@@ -680,13 +685,15 @@ ${fullDiff}
 
     if (analysis.needsImprovement) {
       logger.info(green(`AI suggests improving the last commit message`));
-      logger.box({
-        title: 'Commit Message Comparison',
-        current: lastCommit.message,
-        improved: analysis.improvedCommitMessage,
-        reason: analysis.reason
-      });
+      logger.info(`
+---------------------------
+Commit message analysis:
 
+Current commit message: ${lastCommit.message}
+Improved commit message: ${analysis.improvedCommitMessage}
+Reason for improvement: ${analysis.reason}
+---------------------------
+`);
       const amendConfirm = await confirm(`Amend commit ${lastCommit.hash.substring(0, 7)} with the improved message?`);
 
       if (amendConfirm) {
@@ -862,13 +869,15 @@ Commit message: ${commitMessage}
     }
 
     // Show PR details and confirm
-    logger.box({
-      title: 'Pull Request Details',
-      branch: prData.suggestedBranchName,
-      prTitle: prData.prTitle,
-      description: prData.prDescription
-    });
+    logger.info(`
+---------------------------
+Pull Request Details:
 
+Title: ${prData.prTitle}
+Description: ${prData.prDescription}
+Branch name: ${prData.suggestedBranchName}
+---------------------------
+`);
     const createPRConfirm = await confirm('Create PR with these details?');
 
     if (createPRConfirm) {
@@ -955,8 +964,7 @@ Commit message: ${commitMessage}
             logger.info(yellow('Please create it manually with:'));
             logger.info(`
 Title: ${prData.prTitle}
-Description:
-${prData.prDescription}
+Description: ${prData.prDescription}
 From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `);
@@ -966,8 +974,7 @@ To: ${upstreamBranch.replace('origin/', '')}
           logger.info(yellow('Create PR manually using:'));
           logger.info(`
 Title: ${prData.prTitle}
-Description:
-${prData.prDescription}
+Description: ${prData.prDescription}
 From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `);
@@ -976,8 +983,7 @@ To: ${upstreamBranch.replace('origin/', '')}
         logger.info(yellow('GitHub CLI PR creation skipped. Create PR manually using:'));
         logger.info(`
 Title: ${prData.prTitle}
-Description:
-${prData.prDescription}
+Description: ${prData.prDescription}
 From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `);
