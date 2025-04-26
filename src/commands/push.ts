@@ -25,6 +25,7 @@ export const aliases = ['c'];
 
 interface PushArgv {
   yes?: boolean;
+  'log-request'?: boolean;
 }
 
 /**
@@ -34,12 +35,45 @@ interface PushArgv {
  * @returns Configured yargs instance with push command options
  */
 export function builder(yargs: Argv): Argv<PushArgv> {
-  return yargs.option('yes', {
-    type: 'boolean',
-    alias: 'y',
-    describe: 'Automatically answer yes to all confirmations',
-    default: false
-  });
+  return yargs
+    .option('yes', {
+      type: 'boolean',
+      alias: 'y',
+      describe: 'Automatically answer yes to all confirmations',
+      default: false
+    })
+    .option('log-request', {
+      type: 'boolean',
+      describe: 'Log AI requests for debugging purposes',
+      default: false
+    });
+}
+
+// Define global variables for confirm and logRequest
+let globalConfirm: (message: string, options?: PromptOptions) => Promise<unknown>;
+let globalLogRequest: boolean = false;
+
+// Initialize global variables
+export function initializeGlobals(argv: ArgumentsCamelCase<PushArgv>) {
+  globalConfirm = async (message: string, options: PromptOptions = { type: 'confirm' }) => {
+    if (argv.yes) {
+      logger.info(yellow(`[Auto-confirmed] ${message}`));
+      return true;
+    }
+    return await logger.prompt(green(message), options);
+  };
+
+  globalLogRequest = argv['log-request'] ?? false;
+}
+
+// Modularized function to handle git operations with error handling
+async function performGitOperation<T>(operation: () => Promise<T>, errorMessage: string): Promise<T | null> {
+  try {
+    return await operation();
+  } catch (error) {
+    logger.error(red(`${errorMessage}: ${(error as Error).message}`));
+    return null;
+  }
 }
 
 /**
@@ -55,119 +89,80 @@ export function builder(yargs: Argv): Argv<PushArgv> {
  * cancel or skip steps as desired.
  */
 export async function handler(argv: ArgumentsCamelCase<PushArgv>) {
-  // Helper function to handle prompts based on --yes flag
-  const confirm = async (message: string, options: PromptOptions = { type: 'confirm' }) => {
-    if (argv.yes) {
-      logger.info(yellow(`[Auto-confirmed] ${message}`));
-      return true;
+  initializeGlobals(argv);
+
+  const ready = await globalConfirm(`Are you ready to create an AI PR?`);
+  if (!ready) return;
+
+  try {
+    const currentDir = process.cwd();
+    if (!currentDir) {
+      logger.error(red('Failed to get current working directory.'));
+      return;
     }
-    return await logger.prompt(green(message), options);
-  };
 
-  const ready = await confirm(`Are you ready to create an AI PR?`);
-  if (ready) {
-    try {
-      const currentDir = process.cwd();
-      if (!currentDir) {
-        logger.error(red('Failed to get current working directory.'));
-        return;
-      }
-      const git: SimpleGit = simpleGit({
-        baseDir: currentDir,
-        binary: 'git',
-        maxConcurrentProcesses: 6
-      });
+    const git: SimpleGit = simpleGit({
+      baseDir: currentDir,
+      binary: 'git',
+      maxConcurrentProcesses: 6
+    });
 
-      let status: StatusResult | undefined;
-      try {
-        status = await git.status();
-        if (!status) {
-          logger.error(red('Git status returned undefined.'));
-          return;
-        }
-      } catch (error) {
-        logger.error(red(`Failed to get git status: ${(error as Error).message}`));
-        return;
-      }
+    const status = await performGitOperation(() => git.status(), 'Failed to get git status');
+    if (!status) return;
 
-      // Get upstream branch tracking
-      logger.info(yellow('Next step: Determine the target branch for your PR'));
-      const proceedWithBranch = await confirm('Would you like to proceed with determining the target branch?');
-      if (!proceedWithBranch) {
+    logger.info(yellow('Next step: Determine the target branch for your PR'));
+    const proceedWithBranch = await globalConfirm('Would you like to proceed with determining the target branch?');
+    if (!proceedWithBranch) {
+      logger.info(yellow('Process cancelled by user'));
+      return;
+    }
+
+    const upstreamBranch = await performGitOperation(
+      () => getUpstreamBranch(git, globalConfirm),
+      'Failed to determine upstream branch'
+    );
+    if (!upstreamBranch) return;
+
+    if (!status.isClean()) {
+      logger.info(yellow('Next step: Handle uncommitted changes in your working directory'));
+      const proceedWithChanges = await globalConfirm('Would you like to commit your uncommitted changes?');
+      if (!proceedWithChanges) {
         logger.info(yellow('Process cancelled by user'));
         return;
       }
 
-      let upstreamBranch: string | undefined;
-      try {
-        upstreamBranch = await getUpstreamBranch(git, confirm);
-        if (!upstreamBranch) {
-          logger.error(red('Upstream branch is undefined.'));
-          return;
-        }
-      } catch (error) {
-        logger.error(red(`Failed to determine upstream branch: ${(error as Error).message}`));
-        return;
-      }
-
-      // Handle uncommitted changes
-      if (!status.isClean()) {
-        logger.info(yellow('Next step: Handle uncommitted changes in your working directory'));
-        const proceedWithChanges = await confirm('Would you like to commit your uncommitted changes?');
-        if (!proceedWithChanges) {
-          logger.info(yellow('Process cancelled by user'));
-          return;
-        }
-
-        try {
-          await handleUncommittedChanges(git, status, confirm);
-        } catch (error) {
-          logger.error(red(`Failed to handle uncommitted changes: ${(error as Error).message}`));
-          return;
-        }
-      } else {
-        logger.info(green('Working directory is clean'));
-      }
-
-      // Get all commits and optimize them
-      logger.info(yellow('Next step: Optimize existing commit messages'));
-      const proceedWithOptimize = await confirm('Would you like to optimize your commit messages?');
-      if (!proceedWithOptimize) {
-        logger.info(yellow('Skipping commit message optimization'));
-      } else {
-        try {
-          if (!upstreamBranch) {
-            logger.error(red('Upstream branch is undefined before commit optimization.'));
-            return;
-          }
-          await optimizeCommitMessages(git, upstreamBranch, confirm);
-        } catch (error) {
-          logger.error(red(`Failed to optimize commit messages: ${(error as Error).message}`));
-          // Continue with the process even if message optimization fails
-        }
-      }
-
-      // Create and push a new branch and PR
-      logger.info(yellow('Final step: Create a new branch and push PR to remote'));
-      const proceedWithPR = await confirm('Would you like to proceed with creating a PR?');
-      if (!proceedWithPR) {
-        logger.info(yellow('PR creation cancelled by user'));
-        return;
-      }
-
-      try {
-        if (!upstreamBranch) {
-          logger.error(red('Upstream branch is undefined before PR creation.'));
-          return;
-        }
-        await createAndPushPR(git, upstreamBranch, confirm);
-      } catch (error) {
-        logger.error(red(`Failed to create and push PR: ${(error as Error).message}`));
-        return;
-      }
-    } catch (e) {
-      logger.error(red(`Unexpected error occurred: ${(e as Error).message}`));
+      await performGitOperation(
+        () => handleUncommittedChanges(git, status, globalConfirm),
+        'Failed to handle uncommitted changes'
+      );
+    } else {
+      logger.info(green('Working directory is clean'));
     }
+
+    logger.info(yellow('Next step: Optimize existing commit messages'));
+    const proceedWithOptimize = await globalConfirm('Would you like to optimize your commit messages?');
+    if (proceedWithOptimize) {
+      await performGitOperation(
+        () => optimizeCommitMessages(git, upstreamBranch, globalConfirm),
+        'Failed to optimize commit messages'
+      );
+    } else {
+      logger.info(yellow('Skipping commit message optimization'));
+    }
+
+    logger.info(yellow('Final step: Create a new branch and push PR to remote'));
+    const proceedWithPR = await globalConfirm('Would you like to proceed with creating a PR?');
+    if (!proceedWithPR) {
+      logger.info(yellow('PR creation cancelled by user'));
+      return;
+    }
+
+    await performGitOperation(
+      () => createAndPushPR(git, upstreamBranch, globalConfirm),
+      'Failed to create and push PR'
+    );
+  } catch (e) {
+    logger.error(red(`Unexpected error occurred: ${(e as Error).message}`));
   }
 }
 
@@ -376,7 +371,7 @@ and the following structure:
 
   logger.info(green('Sending changes to LLM for commit suggestion...'));
   const res = await generateCompletion('ollama', {
-    logRequest: true,
+    logRequest: globalLogRequest,
     prompt: `${systemPrompt}
     Git diff changes are as follows:
     ${tempModified.join('')}`
@@ -639,7 +634,6 @@ async function optimizeCommitMessages(
   }
 
   const systemPrompt = `
-${getSystemPrompt()}
 
 First, analyze the current commit message and determine if it needs improvement based on conventional commit best practices.
 Then, analyze both the full branch diff and the specific commit diff to get complete context about the changes.
@@ -824,7 +818,6 @@ async function createAndPushPR(
     : '';
 
   const systemPrompt = `
-${getSystemPrompt()}
 
 Exclude the following branches from suggestions: ${existingBranchNames}
 Format your response as a JSON object with the following length and structure:
@@ -994,59 +987,3 @@ To: ${upstreamBranch.replace('origin/', '')}
     throw new Error('Could not generate PR details');
   }
 }
-
-/**
- * Returns a system prompt for use with LLM requests
- *
- * This function centralizes the system prompt used across different LLM calls,
- * allowing for consistent instructions and formatting requirements.
- * Currently returns an empty string but can be expanded to include standard
- * instructions for all LLM interactions.
- *
- * @returns System prompt string to prepend to LLM requests
- */
-function getSystemPrompt() {
-  return '';
-}
-
-/**
- * Generates a prompt for LLM to analyze diff changes
- *
- * This combines a system prompt with the git diff output to create a structured
- * prompt that instructs the LLM to generate PR metadata in a specific format.
- * The prompt includes clear instructions on required output format and length
- * constraints for each field.
- *
- * @param diffChanges - String containing git diff output for analysis
- * @returns Complete prompt string for LLM with system instructions and user content
- */
-function generateLlmPrompt(diffChanges: string) {
-  const systemPrompt = `
-  ${getSystemPrompt()}
-
-ALWAYS Format your response as a JSON object with the following length and structure:
-- suggestedBranchName: max 50 characters
-- commitMessage: max 120 characters
-- prTitle: max 100 characters
-- prDescription: max 2000 characters
-and the following structure:
-{
-  "suggestedBranchName": "feature/your-feature-name",
-  "commitMessage": "type(scope): summary of changes detailed explanation of changes...",
-  "prTitle": "type(scope): PR Title",
-  "prDescription": "## Summary [Comprehensive description with all sections outlined above]"
-}
-`;
-
-  const userPrompt = `
-PLEASE ANALYZE THE FOLLOWING GIT DIFF AND GENERATE A RESPONSE AS REQUESTED.
-Diff Changes: ${diffChanges}
-
-// Ignore pnpm-lock.yaml, yarn.lock, package-lock.json, and similar files in the analysis.
-`;
-  return `${systemPrompt}${userPrompt}`;
-}
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-const _ = generateLlmPrompt('');
