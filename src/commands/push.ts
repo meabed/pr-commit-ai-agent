@@ -327,8 +327,8 @@ async function handleUncommittedChanges(
     if (!file) continue;
     logger.info(yellow(`Analyzing changes in: ${file}`));
     try {
-      const stagedDiff = await git.diff(['-U3', '--staged', file]);
-      const unstagedDiff = await git.diff(['-U3', file]);
+      const stagedDiff = await git.diff(['-U3', '--minimal', '--staged', file]);
+      const unstagedDiff = await git.diff(['-U3', '--minimal', file]);
       const diff = stagedDiff + unstagedDiff;
       tempModified.push(`
 filename: ${file}
@@ -587,6 +587,7 @@ async function optimizeCommitMessages(
   try {
     fullDiff = await git.diff([
       '-U3',
+      '--minimal',
       upstreamBranch,
       'HEAD',
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
@@ -614,6 +615,7 @@ async function optimizeCommitMessages(
   try {
     commitDiff = await git.show([
       '-U3',
+      '--minimal',
       lastCommit.hash,
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
       ':(exclude)*.generated.*',
