@@ -1,119 +1,141 @@
-# GitHub PR and Commit AI Agent
+# PR Commit AI Agent (GGPR)
+
+GGPR is an intelligent CLI tool that leverages AI to enhance your Git workflow, particularly for creating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
 
 ## Features
 
+- 🤖 **AI-Generated Commit Messages** - Automatically analyze your changes and create conventional commit messages
+- 🔄 **Commit Message Optimization** - Improve existing commit messages with AI suggestions
+- 🌿 **Smart Branch Names** - Generate meaningful branch names based on your changes
+- 📝 **PR Description Generation** - Create comprehensive PR descriptions and titles automatically
+- 🛠️ **Multiple LLM Support** - Works with OpenAI, Anthropic, Ollama, and DeepSeek
+- 🔌 **Local LLM Compatibility** - Use with local models through Ollama for privacy
+
 ## Prerequisites
 
-Before you begin, ensure you have installed [Node.js](https://nodejs.org/) and [pnpm](https://pnpm.io/) on your system.
+Before you begin, ensure you have installed:
+- [Node.js](https://nodejs.org/) (v18 or later)
+- [pnpm](https://pnpm.io/) package manager
+- Git
 
 ## Getting Started
 
-### 4. Set up environment variables
+### 1. Installation
 
-Create a `.env` file in the root directory and configure your environment variables as needed.
+```bash
+# Global installation
+npm install -g pr-commit-ai-agent
+
+# Or with pnpm
+pnpm add -g pr-commit-ai-agent
+
+# Or run from the repository
+git clone https://github.com/meabed/pr-commit-ai-agent.git
+cd pr-commit-ai-agent
+pnpm install
+```
+
+### 2. Configure your LLM provider
+
+Create a `.env` file in the root directory with your API keys:
+
+```env
+# OpenAI (optional)
+OPENAI_API_KEY=your_key_here
+
+# Anthropic (optional)
+ANTHROPIC_API_KEY=your_key_here
+
+# DeepSeek (optional)
+DEEPSEEK_API_KEY=your_key_here
+
+# Ollama (optional, for local models)
+OLLAMA_BASE_URL=http://localhost:11434/api
+```
+
+Only configure the providers you intend to use. By default, the tool will use Ollama if available locally.
 
 ## Usage
 
-This starter comes equipped with several predefined scripts to facilitate development, alongside sample commands to
-demonstrate the capabilities of the CLI application.
+GGPR can be used with the `ggpr` command:
 
-### Running Commands
+### Create a PR with AI assistance
 
-- In development mode, use `pnpm start [command name]` to run any command. This utilizes `ts-node` for a seamless
-  development experience.
-- In production, execute the CLI application directly with `my-project [command name]` to run the desired
-  command from the built project (the name of command should be provided in `package.json` in `bin`).
+```bash
+# Interactive mode
+ggpr
 
-### Sample Commands
+# Auto-confirm all prompts
+ggpr --yes
 
-- **`info`**: Prints information about the current system and Node.js configuration. This command is useful for
-  verifying the environment in which the CLI is running.
-- **`greeting`**: Demonstrates interactive prompts within the CLI. It's a great way to see how user inputs can be
-  handled in a friendly manner.
-- **`create`**: Create new project based on `cli-typescript-starter`.
+# Log all LLM requests for debugging
+ggpr --log-request
+```
 
-All commands are located in the `src/commands/` folder. This organization makes it easy to find and modify commands or
-add new ones as needed.
+The `create` command (the default command) will:
+1. Determine the target branch for your PR
+2. Handle uncommitted changes with AI-generated commit messages
+3. Optimize existing commit messages to follow best practices
+4. Create a branch with an AI-generated name (if needed)
+5. Create a PR with an AI-generated title and description
 
-### Script Commands
+### Get repository information
 
-This starter comes with several predefined scripts to help with development:
+```bash
+ggpr info
+```
 
-- `pnpm build` - Build the project using `tsup`.
-- `pnpm build:watch` - Automatically rebuild the project on file changes.
-- `pnpm commit` - run `commitizen` tool for helping with commit messages.
-- `pnpm commitlint` - lint commit messages.
-- `pnpm compile` - Compile TypeScript files using `tsc`.
-- `pnpm clean` - Remove compiled code from the `dist/` directory.
-- `pnpm format` - Check files for code style issues using Prettier.
-- `pnpm format:fix` - Automatically fix code formatting issues with Prettier.
-- `pnpm lint` - Check code for style issues with ESLint.
-- `pnpm lint:fix` - Automatically fix code style issues with ESLint.
-- `pnpm start [command]` - Run the CLI application using `ts-node`.
-- `pnpm start:node [command]` - Run the CLI application from the `dist/` directory.
-- `pnpm test` - Run unit tests.
-- `pnpm test:watch` - Run tests and watch for file changes.
+## Command Options
 
-## CI/CD and Automation
+### Create Command
 
-[### Automated Version Management and NPM Publishing with Semantic-Release
-
-This project utilizes `semantic-release` to automate version management and the NPM publishing
-process. `Semantic-release` automates the workflow of releasing new versions, including the generation of detailed
-release notes based on commit messages that follow the conventional commit format.
-
-The publishing process is triggered automatically when changes are merged into the main branch. Here's how it works:
-
-1. **Automated Versioning:** Based on the commit messages, `semantic-release` determines the type of version change (
-   major, minor, or patch) and updates the version accordingly.
-2. **Release Notes:** It then generates comprehensive release notes detailing new features, bug fixes, and any breaking
-   changes, enhancing clarity and communication with users.
-3. **NPM Publishing:** Finally, `semantic-release` publishes the new version to the NPM registry and creates a GitHub
-   ]() release with the generated notes.
-
-To ensure a smooth `semantic-release` process:
-
-- Merge feature or fix branches into the main branch following thorough review and testing.
-- Use conventional commit messages to help `semantic-release` accurately determine version changes and generate
-  meaningful release notes.
-- Configure an NPM access token as a GitHub secret under the name `NPM_TOKEN` for authentication during the publication
-  process.
-
-By integrating `semantic-release`, this project streamlines its release process, ensuring that versions are managed
-efficiently and that users are well-informed of each update through automatically generated release notes.
+- `--yes`, `-y`: Automatically confirm all prompts
+- `--log-request`, `-l`: Log all LLM requests and responses
 
 ## Development
 
-To contribute to this project or customize it for your needs, consider the following guidelines:
+To contribute to this project or customize it for your needs:
 
-1. **Code Styling:** Follow the predefined code style, using Prettier for formatting and ESLint for linting, to ensure
-   consistency.
-2. **Commit Messages:** We use `commitizen` and `commitlint` to ensure our commit messages are consistent and follow the
-   conventional commit format, recommended by `@commitlint/config-conventional`. To make a commit, you can
-   run `pnpm commit`, which will guide you through creating a conventional commit message.
-3. **Testing:** Write unit tests for new features or bug fixes using Jest. Make sure to run tests before pushing any
-   changes.
-4. **Environment Variables:** Use the `.env` file for local development. For production, ensure you configure the
-   environment variables in your deployment environment.
-5. **Husky Git Hooks:** This project utilizes Husky to automate linting, formatting, and commit message verification via
-   git hooks. This ensures that code commits meet our quality and style standards without manual checks. The hooks set
-   up include pre-commit hooks for running ESLint and Prettier, and commit-msg hooks for validating commit messages
-   with `commitlint`.
+```bash
+# Clone the repository
+git clone https://github.com/meabed/pr-commit-ai-agent.git
+cd pr-commit-ai-agent
+
+# Install dependencies
+pnpm install
+
+# Run in development mode
+pnpm start create
+```
+
+### Script Commands
+
+- `pnpm build` - Build the project using `tsup`
+- `pnpm build:watch` - Automatically rebuild on file changes
+- `pnpm commit` - Run commitizen for standardized commit messages
+- `pnpm format` - Check files for code style issues
+- `pnpm format:fix` - Fix code formatting issues
+- `pnpm lint` - Check code for style issues
+- `pnpm lint:fix` - Fix code style issues
+- `pnpm start [command]` - Run the CLI using `ts-node`
+- `pnpm test` - Run unit tests
+
+## CI/CD and Automation
+
+This project uses semantic-release for automated versioning and NPM publishing based on conventional commit messages. When changes are merged into the main branch:
+
+1. The version is automatically incremented based on commit types
+2. Release notes are generated from commit messages
+3. The package is published to NPM with the new version
 
 ## Contributing
 
-Contributions are welcome! If you'd like to improve this CLI TypeScript starter, please follow the standard
-fork-and-pull request workflow. Here are a few guidelines to keep in mind:
+Contributions are welcome! Please follow these guidelines:
 
-- Make sure your code adheres to the project's coding standards, including using Prettier for code formatting and ESLint
-  for linting.
-- Follow the conventional commit format for your commit messages. This project uses `commitizen` and `commitlint` with
-  the `@commitlint/config-conventional` configuration, enforced by Husky git hooks.
-- Include tests for new features or bug fixes when applicable.
-- Ensure your changes are properly formatted and linted before submitting a pull request.
-
-By adhering to these guidelines, you help maintain the quality and consistency of the project, making it easier for
-others to contribute and for users to understand and utilize the project effectively.
+1. Follow the code style using Prettier and ESLint
+2. Use conventional commits (run `pnpm commit` to use the interactive tool)
+3. Write tests for new features
+4. Make sure your changes pass linting and tests before submitting a PR
 
 ## License
 
