@@ -97,7 +97,7 @@ async function logRequest(logEntry: LLMLogEntry) {
   }
 }
 
-// Get appropriate model for provider
+// Get the appropriate model for the provider
 const getModelForProvider = (provider: LLMProvider, customModel?: string): string => {
   switch (provider) {
     case 'openai':
@@ -318,7 +318,7 @@ type OllamaGenerateOptions = {
   stop?: string[];
   /** Whether to use NUMA optimization when available */
   numa?: boolean;
-  /** Size of context window in tokens */
+  /** Size of a context window in tokens */
   num_ctx?: number;
   /** Batch size for token processing */
   num_batch?: number;
@@ -445,7 +445,7 @@ export const generateCompletion = async (
     logEntry.response = response;
     logEntry.executionTimeMs = Date.now() - startTime;
 
-    // Only log the request if logRequest option is not explicitly false
+    // Only log the request if the logRequest option is not explicitly false
     if (options.logRequest) {
       await logRequest(logEntry);
     }
@@ -456,7 +456,7 @@ export const generateCompletion = async (
     logEntry.error = (error as Error).message;
     logEntry.executionTimeMs = Date.now() - startTime;
 
-    // Only log the error if logRequest option is not explicitly false
+    // Only log the error if the logRequest option is not explicitly false
     if (options.logRequest) {
       await logRequest(logEntry);
     }

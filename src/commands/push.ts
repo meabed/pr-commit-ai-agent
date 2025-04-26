@@ -186,7 +186,7 @@ const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent';
 /**
  * Determines the upstream branch to use as the target for PR creation
  *
- * First tries to detect the current tracking branch, and if none exists or user declines,
+ * First tries to detect the current tracking branch, and if none exists or the user declines,
  * presents a list of available remote branches to choose from. The user can then select
  * and confirm their choice before proceeding.
  *
@@ -283,7 +283,7 @@ async function getUpstreamBranch(
  * Handles uncommitted changes in the working directory
  *
  * Uses AI to analyze file changes and generate an appropriate commit message that follows
- * conventional commit format. The function:
+ * a conventional commit format. The function:
  * 1. Collects all modified files (excluding ignored files)
  * 2. Gets git diff for each file and combines them for analysis
  * 3. Sends diffs to AI to generate a proper commit message
@@ -327,8 +327,8 @@ async function handleUncommittedChanges(
     if (!file) continue;
     logger.info(yellow(`Analyzing changes in: ${file}`));
     try {
-      const stagedDiff = await git.diff(['--staged', file]);
-      const unstagedDiff = await git.diff([file]);
+      const stagedDiff = await git.diff(['-U3', '--staged', file]);
+      const unstagedDiff = await git.diff(['-U3', file]);
       const diff = stagedDiff + unstagedDiff;
       tempModified.push(`
 filename: ${file}
@@ -462,7 +462,7 @@ async function markCommitAsCreatedByTool(git: SimpleGit, commitHash: string) {
  *
  * @param git - SimpleGit instance for git operations
  * @param commitHash - Hash of the commit to check
- * @returns Promise resolving to boolean indicating if the commit was created by PR Agent
+ * @returns Promise resolving to boolean indicating if PR Agent created the commit
  */
 async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promise<boolean> {
   if (!commitHash) {
@@ -471,7 +471,7 @@ async function isCommitCreatedByTool(git: SimpleGit, commitHash: string): Promis
   }
   try {
     const notes = await git.raw(['notes', '--ref', PR_AGENT_NOTE_NAMESPACE, 'show', commitHash]).catch(() => '');
-    return typeof notes === 'string' && notes.includes(PR_AGENT_NOTE_MESSAGE);
+    return notes.includes(PR_AGENT_NOTE_MESSAGE);
   } catch (error) {
     logger.debug(`Failed to check git notes: ${(error as Error).message}`);
     return false;
@@ -539,7 +539,7 @@ async function optimizeCommitMessages(
     return;
   }
 
-  // Check if the last commit was created by this tool
+  // Check if this tool created the last commit
   const isToolCommit = await isCommitCreatedByTool(git, lastCommit.hash);
   if (isToolCommit) {
     logger.info(yellow(`Last commit was already created by PR Agent, skipping optimization`));
@@ -568,7 +568,7 @@ async function optimizeCommitMessages(
     return;
   }
 
-  // If there are more than 2 entries (commit hash + parent hashes), it's a merge commit
+  // If there are more than 2 entries (commit hash and parent hashes), it's a merge commit
   if (parentHashes.length > 2) {
     logger.info(yellow(`Cannot optimize merge commit: ${lastCommit.hash.substring(0, 7)}`));
     return;
@@ -586,6 +586,7 @@ async function optimizeCommitMessages(
   let fullDiff;
   try {
     fullDiff = await git.diff([
+      '-U3',
       upstreamBranch,
       'HEAD',
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
@@ -612,6 +613,7 @@ async function optimizeCommitMessages(
   let commitDiff;
   try {
     commitDiff = await git.show([
+      '-U3',
       lastCommit.hash,
       ...ignoredFiles.map((file) => `:(exclude)${file}`),
       ':(exclude)*.generated.*',
@@ -737,7 +739,7 @@ ${fullDiff}
  * This function:
  * 1. Gets the latest commit message to use as context
  * 2. Generates a branch name, PR title, and description using AI
- * 3. Creates a new branch if the current branch is the target branch
+ * 3. Creates a new branch if the current branch is target branch
  * 4. Pushes the branch to the remote repository
  * 5. Either creates a PR using GitHub CLI or provides instructions for manual creation
  *
@@ -747,7 +749,7 @@ ${fullDiff}
  * @param git - SimpleGit instance for git operations
  * @param upstreamBranch - Name of the upstream branch to target for the PR
  * @param confirm - Function to handle confirmations (respects --yes flag)
- * @returns Promise that resolves when PR creation is complete or cancelled
+ * @returns Promise that resolves when PR creation is complete or canceled
  */
 async function createAndPushPR(
   git: SimpleGit,
@@ -875,7 +877,7 @@ Commit message: ${commitMessage}
 
       // Only create a new branch if the current branch is the target branch
       if (currentBranch === targetBranchName) {
-        // Create new branch
+        // Create a new branch
         logger.info(
           yellow(`Current branch is the same as target branch. Creating new branch: ${prData.suggestedBranchName}...`)
         );
