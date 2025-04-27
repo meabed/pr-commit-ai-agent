@@ -353,7 +353,7 @@ async function handleUncommittedChanges(
       tempModified.push(`
 filename: ${file}
 diff changes: ${diff}
-____________=========================____________
+
 `);
     } catch (error) {
       logger.warn(yellow(`Failed to get diff for ${file}: ${(error as Error).message}`));
@@ -376,19 +376,14 @@ ____________=========================____________
 
   const commitPrompt = `
 
-Extra Instructions:
-- Provide a better commit message that clearly describes the change using the conventional commit format
-(type(scope): description). Types include: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
-The message should be concise, clear, and follow best practices.
-
-Format your response as a JSON object with the following length and structure:
-- commitMessage: max 120 characters
-and the following structure:
+Provide a better multi-line commit message with summary and bullet points following the ## 1. Commit Message format in the prompt.
+Format your response as a JSON object with structure:
 {
-  "commitMessage": "type(scope): summary of changes detailed explanation of changes..."
+  "commitMessage": "type(scope): summary of changes detailed explanation of changes...\n bullet points of changes"
 }
-    Git diff changes are as follows:
-    ${tempModified.join('')}
+
+Git diff changes are as follows:
+${tempModified.join('')}
 
 `;
 
@@ -862,12 +857,15 @@ async function createAndPushPR(
   }
 
   const prPrompt = `
-  Exclude the following branches from suggestions: ${existingBranchNames}
+
+Exclude the following branches from suggestions: ${existingBranchNames}
+
 Format your response as a JSON object with the following length and structure:
 - suggestedBranchName: max 50 characters
-- prTitle: max 100 characters
-- prDescription: max 2000 characters
-and the following structure:
+- prTitle: max 100 characters and follow the format prompt ## 2. Pull Request Title.
+- prDescription: max 2000 characters and follow the format prompt ## 3. Pull Request Description.
+
+Follow the structure:
 {
   "suggestedBranchName": "feature/descriptive-name",
   "prTitle": "type(scope): PR Title",
