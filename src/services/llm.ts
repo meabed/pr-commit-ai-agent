@@ -31,6 +31,7 @@ interface LLMLogEntry {
   response?: string;
   error?: string;
   executionTimeMs?: number;
+  tokenUsage?: LLMCostEstimate;
 }
 
 /**
@@ -97,7 +98,7 @@ type OllamaGenerateOptions = {
 // Clients and configuration
 let openaiClient: OpenAI | null = null;
 let anthropicClient: Anthropic | null = null;
-const logDir = path.join(os.homedir(), '.llm-logs');
+export const logDir = path.join(os.homedir(), '.llm-logs');
 
 /**
  * Initialize LLM clients based on available API keys in config
@@ -149,20 +150,13 @@ async function ensureLogDirectory(): Promise<void> {
  */
 async function logRequest(logEntry: LLMLogEntry): Promise<string> {
   try {
-    const logFileName = `llm-requests-${new Date().toISOString().split('T')[0]}.jsonl`;
-    const logFilePath = path.join(logDir, logFileName);
-
     // Create a separate JSON file for this specific request for easy manual testing
-    const requestFileName = `request-${logEntry.id}.json`;
+    const requestFileName = `request-${new Date().toISOString().split('T')[0]}-${logEntry.id}.json`;
     const requestFilePath = path.join(logDir, requestFileName);
-
-    // Log the full entry to the daily log file
-    await fs.appendFile(logFilePath, JSON.stringify(logEntry) + '\n', { encoding: 'utf8' });
 
     // Save the request part separately in a structured JSON file for easy reuse
     await fs.writeFile(requestFilePath, JSON.stringify(logEntry, null, 2), { encoding: 'utf8' });
 
-    logger.debug(`Logged LLM request to ${logFilePath}`);
     logger.info(green(`Request saved as ${requestFilePath} (ID: ${logEntry.id})`));
 
     return logEntry.id;
@@ -196,14 +190,22 @@ function getModelForProvider(provider: LLMProvider, customModel?: string): strin
   }
 }
 
+type LLMCostEstimate = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cost?: number;
+};
+
 /**
  * Log token count and estimated cost information
  *
  * @param model The model being used
  * @param input The input prompt
  * @param output Optional output text
+ * @returns The token usage information or undefined if calculation fails
  */
-async function logTokensAndCost(model: string, input: string, output?: string): Promise<void> {
+async function logTokensAndCost(model: string, input: string, output?: string): Promise<LLMCostEstimate | undefined> {
   try {
     // If output is provided, log combined input/output tokens and cost
     if (output) {
@@ -218,7 +220,13 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
           `Input tokens: ${inputOutputCost.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
         )
       );
-      return;
+
+      return {
+        inputTokens: inputOutputCost.inputTokens,
+        outputTokens: inputOutputCost.outputTokens,
+        totalTokens: inputOutputCost.inputTokens + inputOutputCost.outputTokens,
+        cost: inputOutputCost.cost
+      };
     }
     // Log input tokens
     const inputToken = await tokenizeAndEstimateCost({
@@ -226,15 +234,23 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
       input
     });
     logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
+
+    return {
+      inputTokens: inputToken.inputTokens,
+      outputTokens: 0,
+      totalTokens: inputToken.inputTokens,
+      cost: inputToken.cost
+    };
   } catch (error) {
     logger.warn(yellow(`Failed to calculate token usage: ${(error as Error).message}`));
+    return undefined;
   }
 }
 
 /**
  * Generate a completion using OpenAI
  */
-async function openaiGenerate(options: CompletionOptions): Promise<string> {
+async function openaiGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
   if (!openaiClient) {
     throw new Error('OpenAI client not initialized. Check your API key.');
   }
@@ -265,9 +281,9 @@ async function openaiGenerate(options: CompletionOptions): Promise<string> {
     const outputText = response.output_text || '';
 
     // Log combined input/output tokens and cost
-    await logTokensAndCost(model, options.prompt, outputText);
+    const tokenUsage = await logTokensAndCost(model, options.prompt, outputText);
 
-    return outputText;
+    return { text: outputText, tokenUsage };
   } catch (error) {
     throw new Error(`OpenAI API error: ${(error as Error).message}`);
   }
@@ -276,7 +292,7 @@ async function openaiGenerate(options: CompletionOptions): Promise<string> {
 /**
  * Generate a completion using Anthropic
  */
-async function anthropicGenerate(options: CompletionOptions): Promise<string> {
+async function anthropicGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
   if (!anthropicClient) {
     throw new Error('Anthropic client not initialized. Check your API key.');
   }
@@ -314,9 +330,9 @@ async function anthropicGenerate(options: CompletionOptions): Promise<string> {
     const responseText = response.content[0]?.text || '';
 
     // Log combined input/output tokens and cost
-    await logTokensAndCost(model, options.prompt, responseText);
+    const tokenUsage = await logTokensAndCost(model, options.prompt, responseText);
 
-    return responseText;
+    return { text: responseText, tokenUsage };
   } catch (error) {
     throw new Error(`Anthropic API error: ${(error as Error).message}`);
   }
@@ -325,7 +341,7 @@ async function anthropicGenerate(options: CompletionOptions): Promise<string> {
 /**
  * Generate a completion using DeepSeek
  */
-async function deepseekGenerate(options: CompletionOptions): Promise<string> {
+async function deepseekGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
   if (!config.deepseek?.apiKey) {
     throw new Error('DeepSeek API key not configured.');
   }
@@ -381,9 +397,9 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
     const responseText = data.choices[0].message.content || '';
 
     // Log combined input/output tokens and cost
-    await logTokensAndCost(model, options.prompt, responseText);
+    const tokenUsage = await logTokensAndCost(model, options.prompt, responseText);
 
-    return responseText;
+    return { text: responseText, tokenUsage };
   } catch (error) {
     throw new Error(`DeepSeek API error: ${(error as Error).message}`);
   }
@@ -392,7 +408,7 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
 /**
  * Generate a completion using Ollama
  */
-async function ollamaGenerate(options: CompletionOptions): Promise<string> {
+async function ollamaGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
   const model = options.model || config.model || 'llama2';
   const apiUrl = config.ollama?.baseURL || 'http://localhost:11434/api/generate';
 
@@ -409,7 +425,7 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
       stream: false,
       prompt: options.prompt,
       format: 'json',
-      system: getSystemPrompt(),
+      // system: '',
       options: {
         temperature: options.temperature || 0.1,
         num_ctx: 32768,
@@ -445,9 +461,9 @@ async function ollamaGenerate(options: CompletionOptions): Promise<string> {
     const responseText = data.response || '';
 
     // Log combined input/output tokens and cost
-    await logTokensAndCost(model, options.prompt, responseText);
+    const tokenUsage = await logTokensAndCost(model, options.prompt, responseText);
 
-    return responseText;
+    return { text: responseText, tokenUsage };
   } catch (error) {
     throw new Error(`Ollama API error: ${(error as Error).message}`);
   }
@@ -480,6 +496,8 @@ export const generateCompletion = async (
   const model = getModelForProvider(provider, options.model);
   const requestId = uuidv4();
 
+  options.prompt = getSystemPrompt() + options.prompt;
+
   const logEntry: LLMLogEntry = {
     id: requestId,
     timestamp: new Date().toISOString(),
@@ -490,27 +508,49 @@ export const generateCompletion = async (
 
   try {
     let response = '';
+    let tokenUsage;
 
     switch (provider) {
-      case 'openai':
-        response = await openaiGenerate(options);
+      case 'openai': {
+        const openaiResult = await openaiGenerate(options);
+        response = openaiResult.text;
+        tokenUsage = openaiResult.tokenUsage;
         break;
-      case 'anthropic':
-        response = await anthropicGenerate(options);
+      }
+      case 'anthropic': {
+        const anthropicResult = await anthropicGenerate(options);
+        response = anthropicResult.text;
+        tokenUsage = anthropicResult.tokenUsage;
         break;
-      case 'deepseek':
-        response = await deepseekGenerate(options);
+      }
+      case 'deepseek': {
+        const deepseekResult = await deepseekGenerate(options);
+        response = deepseekResult.text;
+        tokenUsage = deepseekResult.tokenUsage;
         break;
-      case 'ollama':
-        response = await ollamaGenerate(options);
+      }
+      case 'ollama': {
+        const ollamaResult = await ollamaGenerate(options);
+        response = ollamaResult.text;
+        tokenUsage = ollamaResult.tokenUsage;
         break;
+      }
       default:
         throw new Error(`Unsupported LLM provider: ${provider}`);
     }
 
-    // Update log entry with response and execution time
+    // Update log entry with response, execution time, and token usage
     logEntry.response = response;
     logEntry.executionTimeMs = Date.now() - startTime;
+
+    if (tokenUsage) {
+      logEntry.tokenUsage = {
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+        totalTokens: tokenUsage.totalTokens,
+        cost: tokenUsage.cost
+      };
+    }
 
     // Only log the request if the logRequest option is true
     if (options.logRequest) {
