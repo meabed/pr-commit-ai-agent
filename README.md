@@ -6,6 +6,10 @@ GGPR is an intelligent CLI tool that uses AI to enhance your Git workflow, creat
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml)
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/meabed/pr-commit-ai-agent/main/assets/demo.gif" alt="GGPR Demo" width="800"/>
+</div>
+
 ## 🚀 Features
 
 - **AI-Generated Commit Messages** - Create semantic commits that follow best practices
@@ -14,14 +18,19 @@ GGPR is an intelligent CLI tool that uses AI to enhance your Git workflow, creat
 - **Automated PR Creation** - Generate PR titles, descriptions, and create them automatically
 - **Multiple LLM Support** - Choose from OpenAI, Anthropic, Ollama, or DeepSeek
 - **Local AI Integration** - Use with local models through Ollama for privacy
+- **Customizable Workflows** - Configure prompts and behavior to match your team's practices
+- **GitHub CLI Integration** - Seamless creation of PRs via GitHub CLI when available
 
 ## 📋 Requirements
 
 - **Node.js** v18+
 - **pnpm** (recommended) or npm
-- **Git** (obviously!)
+- **Git** v2.25+
+- **GitHub CLI** (optional) for PR creation
 
 ## 🛠️ Installation
+
+### Global Installation (for users)
 
 ```bash
 # Install globally with npm
@@ -29,19 +38,28 @@ npm install -g pr-commit-ai-agent
 
 # Or with pnpm (recommended)
 pnpm add -g pr-commit-ai-agent
+```
 
-# Development installation
+### Development Installation (for contributors)
+
+```bash
+# Clone the repository
 git clone https://github.com/meabed/pr-commit-ai-agent.git
 cd pr-commit-ai-agent
+
+# Install dependencies
 pnpm install
+
+# Link the package globally
+pnpm link --global
 ```
 
 ## ⚙️ Configuration
 
-### Option 1: Interactive Configuration
+### Option 1: Interactive Configuration (Recommended)
 
 ```bash
-# Run the config command to set up interactively
+# Run the interactive configuration wizard
 ggpr config
 ```
 
@@ -56,17 +74,22 @@ export OPENAI_API_KEY=your_key_here
 LLM_PROVIDER=ollama MODEL=qwen2.5-coder OLLAMA_BASE_URL=http://0.0.0.0:11434/api/generate ggpr create
 ```
 
+### Option 3: Configuration File
+
+- run `ggpr config` to find the config file location, for example (`~/.config/pr-commit-ai-agent-nodejs/config.json`)
+- modify the config file to set your preferred settings
+
 ### Available Environment Variables
 
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `LLM_PROVIDER` | AI provider to use (`openai`, `anthropic`, `ollama`, `deepseek`) | `openai` |
-| `OPENAI_API_KEY` | OpenAI API key | - |
-| `ANTHROPIC_API_KEY` | Anthropic API key | - |
-| `DEEPSEEK_API_KEY` | DeepSeek API key | - |
-| `OLLAMA_BASE_URL` | URL for Ollama API | `http://localhost:11434/api` |
-| `OLLAMA_API_KEY` | API key for Ollama (if needed) | - |
-| `MODEL` | Override default model for selected provider | Provider-specific |
+| Environment Variable | Description                                                      | Default                      |
+| -------------------- | ---------------------------------------------------------------- | ---------------------------- |
+| `LLM_PROVIDER`       | AI provider to use (`openai`, `anthropic`, `ollama`, `deepseek`) | `openai`                     |
+| `OPENAI_API_KEY`     | OpenAI API key                                                   | -                            |
+| `ANTHROPIC_API_KEY`  | Anthropic API key                                                | -                            |
+| `DEEPSEEK_API_KEY`   | DeepSeek API key                                                 | -                            |
+| `OLLAMA_BASE_URL`    | URL for Ollama API                                               | `http://localhost:11434/api` |
+| `OLLAMA_API_KEY`     | API key for Ollama (if needed)                                   | -                            |
+| `MODEL`              | Override default model for selected provider                     | Provider-specific            |
 
 ## 📝 Usage
 
@@ -89,6 +112,9 @@ ggpr create --log-request
 
 # Combine flags
 ggpr create --yes --log-request
+
+# Skip PR creation
+ggpr create --no-pr
 ```
 
 ### Info Command
@@ -107,17 +133,32 @@ ggpr info --full
 Manage your GGPR configuration settings.
 
 ```bash
-# View current config
-ggpr config list
-
-# Set a config value
-ggpr config set llmProvider ollama
-
-# Reset to defaults
-ggpr config reset
+# View and modify current config
+ggpr config
 ```
 
-## 🚶 Walkthrough
+## 📚 Command Reference
+
+### Common Options
+
+These flags work with most commands:
+
+| Flag        | Alias | Description              |
+| ----------- | ----- | ------------------------ |
+| `--help`    | `-h`  | Show help information    |
+| `--version` | `-v`  | Show version information |
+
+### Create Command Options
+
+| Flag            | Description                                                     |
+| --------------- | --------------------------------------------------------------- | ---------------------------------- |
+| `--yes`         | `-y`                                                            | Auto-confirm all prompts           |
+| `--log-request` | `-l`                                                            | Log LLM API requests for debugging |
+| `--no-pr`       | Generate commit description and commit only without creating PR |
+
+### Config Command Options
+
+## 🚶 Workflow
 
 The `create` command workflow:
 
@@ -149,32 +190,36 @@ pnpm build
 
 ### Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm build` | Build the project using tsup |
-| `pnpm build:watch` | Build with file watching |
-| `pnpm start [cmd]` | Run the CLI using ts-node |
-| `pnpm commit` | Use commitizen for standard commit messages |
-| `pnpm format` | Check code formatting |
-| `pnpm format:fix` | Fix code formatting issues |
-| `pnpm lint` | Check for code style issues |
-| `pnpm lint:fix` | Fix code style issues |
-| `pnpm test` | Run unit tests |
+| Command            | Description                                 |
+| ------------------ | ------------------------------------------- |
+| `pnpm build`       | Build the project using tsup                |
+| `pnpm build:watch` | Build with file watching                    |
+| `pnpm start [cmd]` | Run the CLI using ts-node                   |
+| `pnpm commit`      | Use commitizen for standard commit messages |
+| `pnpm format`      | Check code formatting                       |
+| `pnpm format:fix`  | Fix code formatting issues                  |
+| `pnpm lint`        | Check for code style issues                 |
+| `pnpm lint:fix`    | Fix code style issues                       |
+| `pnpm test`        | Run unit tests                              |
+| `pnpm release`     | Create a new release                        |
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these guidelines:
-
-1. **Fork & Branch** - Create a feature branch from `main`
-2. **Follow Conventions** - Use consistent code style and commit message format
-3. **Test** - Add tests for new features and ensure existing tests pass
-4. **Document** - Update documentation to reflect your changes
-5. **Pull Request** - Submit a PR with a clear description of your changes
-
-### Commit Guidelines
-
-This project uses conventional commits. Run `pnpm commit` to use the interactive commit tool.
+We welcome contributions of all sizes! Here's how you can help:
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+---
+
+<div align="center">
+  <p>Made with ❤️ by <a href="https://github.com/meabed">Mohamed Meabed</a> and contributors</p>
+  <p>
+    <a href="https://github.com/meabed/pr-commit-ai-agent/stargazers">⭐ Star us on GitHub</a> •
+    <a href="https://github.com/meabed/pr-commit-ai-agent/issues">🐛 Report Bug</a> •
+    <a href="https://github.com/meabed/pr-commit-ai-agent/issues">✨ Request Feature</a>
+  </p>
+</div>
+
+`
