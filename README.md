@@ -75,6 +75,7 @@ LLM_PROVIDER=ollama MODEL=qwen2.5-coder OLLAMA_BASE_URL=http://0.0.0.0:11434/api
 ```
 
 ### Option 3: Configuration File
+
 - run `ggpr config` to find the config file location, for example (`~/.config/pr-commit-ai-agent-nodejs/config.json`)
 - modify the config file to set your preferred settings
 
@@ -142,21 +143,20 @@ ggpr config
 
 These flags work with most commands:
 
-| Flag           | Alias | Description                               |
-|----------------|-------|-------------------------------------------|
-| `--help`       | `-h`  | Show help information                     |
-| `--version`    | `-v`  | Show version information                  |
+| Flag        | Alias | Description              |
+| ----------- | ----- | ------------------------ |
+| `--help`    | `-h`  | Show help information    |
+| `--version` | `-v`  | Show version information |
 
 ### Create Command Options
 
-| Flag           | Description                                       |
-|---------------|---------------------------------------------------|
-| `--yes`        | `-y`  | Auto-confirm all prompts                  |
-| `--log-request`| `-l`  | Log LLM API requests for debugging        |
-| `--no-pr`     | Generate commit description and commit only without creating PR |
+| Flag            | Description                                                     |
+| --------------- | --------------------------------------------------------------- | ---------------------------------- |
+| `--yes`         | `-y`                                                            | Auto-confirm all prompts           |
+| `--log-request` | `-l`                                                            | Log LLM API requests for debugging |
+| `--no-pr`       | Generate commit description and commit only without creating PR |
 
 ### Config Command Options
-
 
 ## 🚶 Workflow
 
