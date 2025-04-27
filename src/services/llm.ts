@@ -429,6 +429,7 @@ async function ollamaGenerate(options: CompletionOptions): Promise<{ text: strin
       options: {
         temperature: options.temperature || 0.1,
         num_ctx: 32768,
+        // num_batch: 8,
         top_p: 0.8
       } as OllamaGenerateOptions
     });

@@ -1,5 +1,5 @@
 /**
- * This module implements the 'create' command which helps users create AI-assisted
+ * This module implements the 'create' command, which helps users create AI-assisted
  * pull requests. It provides functionality for optimizing commit messages,
  * creating branch names, generating PR titles and descriptions using AI.
  *

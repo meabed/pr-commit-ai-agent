@@ -1,3 +1,9 @@
+/**
+ * This module implements the 'logs' command, which allows users to view and manage
+ * logs of requests and responses to/from the LLM. It supports viewing, deleting,
+ * and navigating through log files interactively.
+ */
+
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { logger } from '../logger';

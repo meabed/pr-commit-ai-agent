@@ -1,3 +1,9 @@
+/**
+ * This module implements the 'info' command, which displays information about
+ * the current repository, system, and configuration. It supports a detailed view
+ * with the `--full` option.
+ */
+
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { logger } from '../logger';
 import * as process from 'node:process';
