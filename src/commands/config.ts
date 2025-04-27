@@ -9,9 +9,16 @@ export const aliases = ['conf', 'c'];
 type ConfigAction = 'list' | 'set' | 'get' | 'reset' | 'exit';
 
 export async function handler() {
+  // Setup Ctrl+C handler
+  process.on('SIGINT', () => {
+    logger.info(yellow('\nConfiguration manager exited with Ctrl+C'));
+    process.exit(0);
+  });
+
   // Interactive mode
   logger.info(bold(blue('PR-Agent Configuration Manager')));
   logger.info(yellow('Current configuration path: ') + blue(configInstance.path));
+  logger.info(yellow('Press Ctrl+C at any time to exit'));
 
   // Display current configuration
   displayCurrentConfig();
@@ -65,9 +72,10 @@ async function configurationLoop() {
     logger.info('5. Configure DeepSeek settings');
     logger.info('6. Configure Ollama settings');
     logger.info('7. Reset all settings to defaults');
-    logger.info('8. Exit configuration');
+    logger.info('8. Show current configuration values');
+    logger.info('9. Exit configuration');
 
-    const choice = await logger.prompt(yellow('Select an option (1-8):'), {
+    const choice = await logger.prompt(yellow('Select an option:'), {
       type: 'select',
       options: [
         '1. Set LLM provider',
@@ -77,7 +85,8 @@ async function configurationLoop() {
         '5. Configure DeepSeek',
         '6. Configure Ollama',
         '7. Reset to defaults',
-        '8. Exit'
+        '8. Show current configuration',
+        '9. Exit'
       ]
     });
 
@@ -103,7 +112,10 @@ async function configurationLoop() {
       case '7. Reset to defaults':
         await resetConfig();
         break;
-      case '8. Exit':
+      case '8. Show current configuration':
+        displayCurrentConfig();
+        break;
+      case '9. Exit':
         exit = true;
         break;
     }

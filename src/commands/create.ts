@@ -27,6 +27,7 @@ interface CreateArgv {
   'log-request'?: boolean;
   provider?: string;
   model?: string;
+  'no-pr'?: boolean;
 }
 
 /**
@@ -46,6 +47,11 @@ export function builder(yargs: Argv): Argv<CreateArgv> {
     .option('log-request', {
       type: 'boolean',
       describe: 'Log AI requests for debugging purposes',
+      default: false
+    })
+    .option('no-pr', {
+      type: 'boolean',
+      describe: 'Skip creating a PR, only optimize commit messages',
       default: false
     })
     .option('provider', {
@@ -154,15 +160,14 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
       logger.info(green('Working directory is clean'));
     }
 
-    logger.info(yellow('Next step: Optimize existing commit messages'));
-    const proceedWithOptimize = await globalConfirm('Would you like to optimize your commit messages?');
-    if (proceedWithOptimize) {
-      await performGitOperation(
-        () => optimizeCommitMessages(git, upstreamBranch, globalConfirm),
-        'Failed to optimize commit messages'
-      );
-    } else {
-      logger.info(yellow('Skipping commit message optimization'));
+    await performGitOperation(
+      () => optimizeCommitMessages(git, upstreamBranch, globalConfirm),
+      'Failed to optimize commit messages'
+    );
+
+    if (argv['no-pr']) {
+      logger.info(yellow('Skipping branch creation and PR process as per --no-pr flag'));
+      return;
     }
 
     logger.info(yellow('Final step: Create a new branch and push PR to remote'));
@@ -551,6 +556,13 @@ async function optimizeCommitMessages(
   }
 
   logger.info(green(`Found ${commits.all.length} commit(s) in the branch`));
+  logger.info(yellow('Next step: Optimize existing commit messages'));
+
+  const proceedWithOptimize = await globalConfirm('Would you like to optimize your commit messages?');
+  if (!proceedWithOptimize) {
+    logger.info(yellow('Skipping commit message optimization'));
+    return;
+  }
 
   // Only focus on the last commit for optimization
   const lastCommit = commits?.all?.[0];
