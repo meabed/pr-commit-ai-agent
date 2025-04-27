@@ -1,6 +1,6 @@
 # PR Commit AI Agent (GGPR)
 
-GGPR is an intelligent CLI tool that leverages AI to enhance your Git workflow, particularly for creating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
+GGPR is an intelligent CLI tool leveraging AI to enhance Git workflows by generating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
 
 ## Features
 
