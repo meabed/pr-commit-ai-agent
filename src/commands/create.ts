@@ -376,7 +376,7 @@ diff changes: ${diff}
 
   const commitPrompt = `
 
-Provide a better multi-line commit message with summary and bullet points following the ## 1. Commit Message format in the prompt.
+Provide a better multi-line commit message with summary and bullet points for all changes following the ## 1. Commit Message format in the prompt.
 Format your response as a JSON object with structure:
 {
   "commitMessage": "type(scope): summary of changes detailed explanation of changes...\n bullet points of changes"
