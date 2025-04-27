@@ -139,24 +139,81 @@ ggpr config
 
 ## 📚 Command Reference
 
+### Create Command
+
+The `create` command is the primary command for generating AI-enhanced commits and pull requests. It guides you through the process of creating commit messages, optimizing them, and generating pull requests.
+
+#### Usage
+```bash
+ggpr create
+```
+
+#### Options
+| Flag            | Alias | Description                                                     |
+| --------------- | ----- | --------------------------------------------------------------- |
+| `--yes`         | `-y`  | Auto-confirm all prompts                                        |
+| `--log-request` | `-l`  | Log LLM API requests for debugging                              |
+| `--no-pr`       |       | Generate commit description and commit only without creating PR |
+
+---
+
+### Config Command
+
+The `config` command allows you to view and modify the configuration settings for GGPR. You can use it interactively or modify the configuration file directly.
+
+#### Usage
+```bash
+ggpr config
+```
+
+#### Options
+| Flag        | Alias | Description           |
+| ----------- | ----- | --------------------- |
+| `--help`    | `-h`  | Show help information |
+
+---
+
+### Logs Command
+
+The `logs` command provides access to the logs of previous LLM requests and responses. This is useful for debugging or reviewing past interactions.
+
+#### Usage
+```bash
+ggpr logs
+```
+
+#### Options
+| Flag        | Alias | Description           |
+| ----------- | ----- | --------------------- |
+| `--help`    | `-h`  | Show help information |
+
+---
+
+### Info Command
+
+The `info` command displays information about the current repository, including its status and configuration.
+
+#### Usage
+```bash
+ggpr info
+```
+
+#### Options
+| Flag        | Alias | Description              |
+| ----------- | ----- | ------------------------ |
+| `--full`    |       | Show detailed information|
+| `--help`    | `-h`  | Show help information    |
+
+---
+
 ### Common Options
 
-These flags work with most commands:
+These flags are available for most commands:
 
 | Flag        | Alias | Description              |
 | ----------- | ----- | ------------------------ |
 | `--help`    | `-h`  | Show help information    |
 | `--version` | `-v`  | Show version information |
-
-### Create Command Options
-
-| Flag            | Description                                                     |
-| --------------- | --------------------------------------------------------------- | ---------------------------------- |
-| `--yes`         | `-y`                                                            | Auto-confirm all prompts           |
-| `--log-request` | `-l`                                                            | Log LLM API requests for debugging |
-| `--no-pr`       | Generate commit description and commit only without creating PR |
-
-### Config Command Options
 
 ## 🚶 Workflow
 
@@ -221,5 +278,3 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
     <a href="https://github.com/meabed/pr-commit-ai-agent/issues">✨ Request Feature</a>
   </p>
 </div>
-
-`

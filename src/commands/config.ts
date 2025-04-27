@@ -1,3 +1,9 @@
+/**
+ * This module implements the 'config' command, which allows users to view and modify
+ * configuration settings for the GGPR tool. It supports interactive configuration
+ * and direct modification of settings such as LLM provider, default model, and API keys.
+ */
+
 import { logger } from '../logger';
 import { blue, bold, green, red, yellow } from 'picocolors';
 import { config, configInstance, initializeConfig } from '../config';
