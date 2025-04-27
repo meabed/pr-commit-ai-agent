@@ -3,6 +3,15 @@ import Conf from 'conf';
 
 // Define schema for configuration with types, defaults, and validation
 const schema = {
+  llmProvider: {
+    type: 'string',
+    enum: ['openai', 'anthropic', 'deepseek', 'ollama'],
+    default: 'openai'
+  },
+  model: {
+    type: 'string',
+    default: 'gpt-3.5-turbo'
+  },
   openai: {
     type: 'object',
     properties: {
@@ -14,10 +23,6 @@ const schema = {
         type: 'string',
         format: 'uri',
         default: 'https://api.openai.com/v1'
-      },
-      defaultModel: {
-        type: 'string',
-        default: 'gpt-3.5-turbo'
       }
     }
   },
@@ -28,9 +33,10 @@ const schema = {
         type: 'string',
         default: ''
       },
-      defaultModel: {
+      baseURL: {
         type: 'string',
-        default: 'claude-3-sonnet-20240229'
+        format: 'uri',
+        default: 'https://api.anthropic.com/v1'
       }
     }
   },
@@ -45,10 +51,6 @@ const schema = {
         type: 'string',
         format: 'uri',
         default: 'https://api.deepseek.com/v1'
-      },
-      defaultModel: {
-        type: 'string',
-        default: 'deepseek-chat'
       }
     }
   },
@@ -63,10 +65,6 @@ const schema = {
       apiKey: {
         type: 'string',
         default: ''
-      },
-      defaultModel: {
-        type: 'string',
-        default: 'llama2'
       }
     }
   }
@@ -79,7 +77,13 @@ export const configInstance = new Conf({
 });
 
 // Initialize with environment variables or use existing stored values
-function initializeConfig() {
+export function initializeConfig() {
+  if (process.env.LLM_PROVIDER) {
+    configInstance.set('llmProvider', process.env.LLM_PROVIDER);
+  }
+  if (process.env.MODEL) {
+    configInstance.set('model', process.env.MODEL);
+  }
   // OpenAI configuration
   if (process.env.OPENAI_API_KEY) {
     configInstance.set('openai.apiKey', process.env.OPENAI_API_KEY);
@@ -91,6 +95,9 @@ function initializeConfig() {
   // Anthropic configuration
   if (process.env.ANTHROPIC_API_KEY) {
     configInstance.set('anthropic.apiKey', process.env.ANTHROPIC_API_KEY);
+  }
+  if (process.env.ANTHROPIC_BASE_URL) {
+    configInstance.set('anthropic.baseURL', process.env.ANTHROPIC_BASE_URL);
   }
 
   // DeepSeek configuration
@@ -108,9 +115,6 @@ function initializeConfig() {
   if (process.env.OLLAMA_BASE_URL) {
     configInstance.set('ollama.baseURL', process.env.OLLAMA_BASE_URL);
   }
-  if (process.env.OLLAMA_DEFAULT_MODEL) {
-    configInstance.set('ollama.defaultModel', process.env.OLLAMA_DEFAULT_MODEL);
-  }
 }
 
 // Initialize with environment variables
@@ -118,23 +122,22 @@ initializeConfig();
 
 // Export the entire configuration object
 export const config = {
+  llmProvider: configInstance.get('llmProvider') as string,
+  model: configInstance.get('model') as string,
   openai: {
     apiKey: configInstance.get('openai.apiKey') as string,
-    baseURL: configInstance.get('openai.baseURL') as string,
-    defaultModel: configInstance.get('openai.defaultModel') as string
+    baseURL: configInstance.get('openai.baseURL') as string
   },
   anthropic: {
     apiKey: configInstance.get('anthropic.apiKey') as string,
-    defaultModel: configInstance.get('anthropic.defaultModel') as string
+    baseURL: configInstance.get('anthropic.baseURL') as string
   },
   deepseek: {
     apiKey: configInstance.get('deepseek.apiKey') as string,
-    baseURL: configInstance.get('deepseek.baseURL') as string,
-    defaultModel: configInstance.get('deepseek.defaultModel') as string
+    baseURL: configInstance.get('deepseek.baseURL') as string
   },
   ollama: {
     baseURL: configInstance.get('ollama.baseURL') as string,
-    apiKey: configInstance.get('ollama.apiKey') as string,
-    defaultModel: configInstance.get('ollama.defaultModel') as string
+    apiKey: configInstance.get('ollama.apiKey') as string
   }
 };

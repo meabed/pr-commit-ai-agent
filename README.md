@@ -1,142 +1,180 @@
-# PR Commit AI Agent (GGPR)
+# GGPR - PR & Commit AI Assistant
 
-GGPR is an intelligent CLI tool that leverages AI to enhance your Git workflow, particularly for creating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
+GGPR is an intelligent CLI tool that uses AI to enhance your Git workflow, creating high-quality commit messages and pull requests with minimal effort.
 
-## Features
+[![NPM Version](https://img.shields.io/npm/v/pr-commit-ai-agent.svg)](https://www.npmjs.com/package/pr-commit-ai-agent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml)
 
-- 🤖 **AI-Generated Commit Messages** - Automatically analyze your changes and create conventional commit messages
-- 🔄 **Commit Message Optimization** - Improve existing commit messages with AI suggestions
-- 🌿 **Smart Branch Names** - Generate meaningful branch names based on your changes
-- 📝 **PR Description Generation** - Create comprehensive PR descriptions and titles automatically
-- 🛠️ **Multiple LLM Support** - Works with OpenAI, Anthropic, Ollama, and DeepSeek
-- 🔌 **Local LLM Compatibility** - Use with local models through Ollama for privacy
+## 🚀 Features
 
-## Prerequisites
+- **AI-Generated Commit Messages** - Create semantic commits that follow best practices
+- **Commit Message Optimization** - Improve existing messages with AI suggestions
+- **Smart Branch Names** - Generate descriptive branch names based on your changes
+- **Automated PR Creation** - Generate PR titles, descriptions, and create them automatically
+- **Multiple LLM Support** - Choose from OpenAI, Anthropic, Ollama, or DeepSeek
+- **Local AI Integration** - Use with local models through Ollama for privacy
 
-Before you begin, ensure you have installed:
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [pnpm](https://pnpm.io/) package manager
-- Git
+## 📋 Requirements
 
-## Getting Started
+- **Node.js** v18+
+- **pnpm** (recommended) or npm
+- **Git** (obviously!)
 
-### 1. Installation
+## 🛠️ Installation
 
 ```bash
-# Global installation
+# Install globally with npm
 npm install -g pr-commit-ai-agent
 
-# Or with pnpm
+# Or with pnpm (recommended)
 pnpm add -g pr-commit-ai-agent
 
-# Or run from the repository
+# Development installation
 git clone https://github.com/meabed/pr-commit-ai-agent.git
 cd pr-commit-ai-agent
 pnpm install
 ```
 
-### 2. Configure your LLM provider
+## ⚙️ Configuration
 
-Create a `.env` file in the root directory with your API keys:
-
-```env
-# OpenAI (optional)
-OPENAI_API_KEY=your_key_here
-
-# Anthropic (optional)
-ANTHROPIC_API_KEY=your_key_here
-
-# DeepSeek (optional)
-DEEPSEEK_API_KEY=your_key_here
-
-# Ollama (optional, for local models)
-OLLAMA_BASE_URL=http://localhost:11434/api
-```
-
-Only configure the providers you intend to use. By default, the tool will use Ollama if available locally.
-
-## Usage
-
-GGPR can be used with the `ggpr` command:
-
-### Create a PR with AI assistance
+### Option 1: Interactive Configuration
 
 ```bash
-# Interactive mode
+# Run the config command to set up interactively
+ggpr config
+```
+
+### Option 2: Environment Variables
+
+```bash
+# Set for current session
+export LLM_PROVIDER=openai
+export OPENAI_API_KEY=your_key_here
+
+# Or pass inline for a single command
+LLM_PROVIDER=ollama MODEL=qwen2.5-coder OLLAMA_BASE_URL=http://0.0.0.0:11434/api/generate ggpr create
+```
+
+### Available Environment Variables
+
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `LLM_PROVIDER` | AI provider to use (`openai`, `anthropic`, `ollama`, `deepseek`) | `openai` |
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - |
+| `DEEPSEEK_API_KEY` | DeepSeek API key | - |
+| `OLLAMA_BASE_URL` | URL for Ollama API | `http://localhost:11434/api` |
+| `OLLAMA_API_KEY` | API key for Ollama (if needed) | - |
+| `MODEL` | Override default model for selected provider | Provider-specific |
+
+## 📝 Usage
+
+### Create Command (Default)
+
+Guides you through creating AI-enhanced commits, optimizing messages, and creating a PR.
+
+```bash
+# Basic usage (interactive)
+ggpr create
+
+# Or just:
 ggpr
 
 # Auto-confirm all prompts
-ggpr --yes
+ggpr create --yes
 
 # Log all LLM requests for debugging
-ggpr --log-request
+ggpr create --log-request
+
+# Combine flags
+ggpr create --yes --log-request
 ```
 
-The `create` command (the default command) will:
-1. Determine the target branch for your PR
-2. Handle uncommitted changes with AI-generated commit messages
-3. Optimize existing commit messages to follow best practices
-4. Create a branch with an AI-generated name (if needed)
-5. Create a PR with an AI-generated title and description
+### Info Command
 
-### Get repository information
+Shows repository information and status.
 
 ```bash
 ggpr info
+
+# Show detailed information
+ggpr info --full
 ```
 
-## Command Options
+### Config Command
 
-### Create Command
-
-- `--yes`, `-y`: Automatically confirm all prompts
-- `--log-request`, `-l`: Log all LLM requests and responses
-
-## Development
-
-To contribute to this project or customize it for your needs:
+Manage your GGPR configuration settings.
 
 ```bash
-# Clone the repository
-git clone https://github.com/meabed/pr-commit-ai-agent.git
-cd pr-commit-ai-agent
+# View current config
+ggpr config list
 
-# Install dependencies
-pnpm install
+# Set a config value
+ggpr config set llmProvider ollama
 
-# Run in development mode
-pnpm start create
+# Reset to defaults
+ggpr config reset
 ```
 
-### Script Commands
+## 🚶 Walkthrough
 
-- `pnpm build` - Build the project using `tsup`
-- `pnpm build:watch` - Automatically rebuild on file changes
-- `pnpm commit` - Run commitizen for standardized commit messages
-- `pnpm format` - Check files for code style issues
-- `pnpm format:fix` - Fix code formatting issues
-- `pnpm lint` - Check code for style issues
-- `pnpm lint:fix` - Fix code style issues
-- `pnpm start [command]` - Run the CLI using `ts-node`
-- `pnpm test` - Run unit tests
+The `create` command workflow:
 
-## CI/CD and Automation
+1. **Target Branch Selection** - Choose which branch to target for your PR
+2. **Uncommitted Changes** - Generate an AI commit message for your changes
+3. **Commit Optimization** - AI improves your existing commit messages
+4. **Branch Creation** - Creates a branch with an AI-generated name if needed
+5. **PR Creation** - Creates a PR with AI-generated title and description
 
-This project uses semantic-release for automated versioning and NPM publishing based on conventional commit messages. When changes are merged into the main branch:
+## 🛠️ Development
 
-1. The version is automatically incremented based on commit types
-2. Release notes are generated from commit messages
-3. The package is published to NPM with the new version
+### Quick Start for Contributors
 
-## Contributing
+```bash
+# Clone and setup
+git clone https://github.com/meabed/pr-commit-ai-agent.git
+cd pr-commit-ai-agent
+pnpm install
+
+# Development mode
+pnpm start create
+
+# Testing
+pnpm test
+
+# Build
+pnpm build
+```
+
+### Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm build` | Build the project using tsup |
+| `pnpm build:watch` | Build with file watching |
+| `pnpm start [cmd]` | Run the CLI using ts-node |
+| `pnpm commit` | Use commitizen for standard commit messages |
+| `pnpm format` | Check code formatting |
+| `pnpm format:fix` | Fix code formatting issues |
+| `pnpm lint` | Check for code style issues |
+| `pnpm lint:fix` | Fix code style issues |
+| `pnpm test` | Run unit tests |
+
+## 🤝 Contributing
 
 Contributions are welcome! Please follow these guidelines:
 
-1. Follow the code style using Prettier and ESLint
-2. Use conventional commits (run `pnpm commit` to use the interactive tool)
-3. Write tests for new features
-4. Make sure your changes pass linting and tests before submitting a PR
+1. **Fork & Branch** - Create a feature branch from `main`
+2. **Follow Conventions** - Use consistent code style and commit message format
+3. **Test** - Add tests for new features and ensure existing tests pass
+4. **Document** - Update documentation to reflect your changes
+5. **Pull Request** - Submit a PR with a clear description of your changes
 
-## License
+### Commit Guidelines
+
+This project uses conventional commits. Run `pnpm commit` to use the interactive commit tool.
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
