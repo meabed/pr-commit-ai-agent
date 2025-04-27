@@ -13,9 +13,10 @@ import * as process from 'node:process';
 import { logger } from '../logger';
 import { green, red, yellow } from 'picocolors';
 import { simpleGit, SimpleGit, StatusResult } from 'simple-git';
-import { generateCompletion } from '../services/llm';
+import { generateCompletion, LLMProvider } from '../services/llm';
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { PromptOptions } from 'consola';
+import { config } from '../config';
 
 export const command = 'create';
 export const describe = 'Generate commit messages and create a PR using AI';
@@ -24,6 +25,8 @@ export const aliases = ['c'];
 interface CreateArgv {
   yes?: boolean;
   'log-request'?: boolean;
+  provider?: string;
+  model?: string;
 }
 
 /**
@@ -44,12 +47,24 @@ export function builder(yargs: Argv): Argv<CreateArgv> {
       type: 'boolean',
       describe: 'Log AI requests for debugging purposes',
       default: false
+    })
+    .option('provider', {
+      type: 'string',
+      describe: 'LLM provider to use (e.g., openai, ollama)',
+      default: config.llmProvider
+    })
+    .option('model', {
+      type: 'string',
+      describe: 'LLM model to use (e.g., gpt-3.5-turbo, gpt-4)',
+      default: config.model
     });
 }
 
 // Define global variables for confirm and logRequest
 let globalConfirm: (message: string, options?: PromptOptions) => Promise<unknown>;
 let globalLogRequest: boolean = false;
+let model: string;
+let provider: LLMProvider;
 
 // Initialize global variables
 export function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
@@ -62,6 +77,8 @@ export function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
   };
 
   globalLogRequest = argv['log-request'] ?? false;
+  provider = argv.provider as LLMProvider;
+  model = argv.model!;
 }
 
 // Modularized function to handle git operations with error handling
@@ -371,7 +388,8 @@ and the following structure:
 `;
 
   logger.info(green('Sending changes to LLM for commit suggestion...'));
-  const res = await generateCompletion('ollama', {
+  const res = await generateCompletion(provider, {
+    model,
     logRequest: globalLogRequest,
     prompt: commitPrompt
   });
@@ -666,7 +684,8 @@ ${fullDiff}
 `;
 
   logger.info(yellow(`Requesting commit message analysis from AI with comprehensive context...`));
-  const res = await generateCompletion('ollama', {
+  const res = await generateCompletion(provider, {
+    model,
     logRequest: globalLogRequest,
     prompt: promptMsg
   });
@@ -852,7 +871,8 @@ Full diff from ${upstreamBranch} to HEAD:
 ${fullDiff}
 `;
 
-  const res = await generateCompletion('ollama', {
+  const res = await generateCompletion(provider, {
+    model,
     logRequest: globalLogRequest,
     prompt: prPrompt
   });

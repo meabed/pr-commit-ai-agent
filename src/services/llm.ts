@@ -184,13 +184,13 @@ function getModelForProvider(provider: LLMProvider, customModel?: string): strin
 
   switch (provider) {
     case 'openai':
-      return config.openai?.defaultModel || 'gpt-3.5-turbo';
+      return config.model || 'gpt-3.5-turbo';
     case 'anthropic':
-      return config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
+      return config.model || 'claude-3-sonnet-20240229';
     case 'deepseek':
-      return config.deepseek?.defaultModel || 'deepseek-chat';
+      return config.model || 'deepseek-chat';
     case 'ollama':
-      return config.ollama?.defaultModel || 'llama2';
+      return config.model || 'llama2';
     default:
       return 'unknown';
   }
@@ -239,7 +239,7 @@ async function openaiGenerate(options: CompletionOptions): Promise<string> {
     throw new Error('OpenAI client not initialized. Check your API key.');
   }
 
-  const model = options.model || config.openai?.defaultModel || 'gpt-3.5-turbo';
+  const model = options.model || config.model || 'gpt-3.5-turbo';
   logger.info(yellow(`Making OpenAI completion request with model: ${model}`));
 
   // Log input tokens
@@ -281,7 +281,7 @@ async function anthropicGenerate(options: CompletionOptions): Promise<string> {
     throw new Error('Anthropic client not initialized. Check your API key.');
   }
 
-  const model = options.model || config.anthropic?.defaultModel || 'claude-3-sonnet-20240229';
+  const model = options.model || config.model || 'claude-3-sonnet-20240229';
   logger.info(yellow(`Making Anthropic completion request with model: ${model}`));
 
   // Log input tokens
@@ -330,7 +330,7 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
     throw new Error('DeepSeek API key not configured.');
   }
 
-  const model = options.model || config.deepseek?.defaultModel || 'deepseek-chat';
+  const model = options.model || config.model || 'deepseek-chat';
   const apiUrl = config.deepseek?.baseURL || 'https://api.deepseek.com/v1/chat/completions';
 
   logger.info(yellow(`Making DeepSeek completion request with model: ${model}`));
@@ -393,7 +393,7 @@ async function deepseekGenerate(options: CompletionOptions): Promise<string> {
  * Generate a completion using Ollama
  */
 async function ollamaGenerate(options: CompletionOptions): Promise<string> {
-  const model = options.model || config.ollama?.defaultModel || 'llama2';
+  const model = options.model || config.model || 'llama2';
   const apiUrl = config.ollama?.baseURL || 'http://localhost:11434/api/generate';
 
   logger.info(yellow(`Making Ollama completion request with model: ${model}`));
