@@ -13,9 +13,10 @@ import * as process from 'node:process';
 import { logger } from '../logger';
 import { green, red, yellow } from 'picocolors';
 import { simpleGit, SimpleGit, StatusResult } from 'simple-git';
-import { generateCompletion } from '../services/llm';
+import { generateCompletion, LLMProvider } from '../services/llm';
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { PromptOptions } from 'consola';
+import { config } from '../config';
 
 export const command = 'create';
 export const describe = 'Generate commit messages and create a PR using AI';
@@ -24,6 +25,9 @@ export const aliases = ['c'];
 interface CreateArgv {
   yes?: boolean;
   'log-request'?: boolean;
+  provider?: string;
+  model?: string;
+  'no-pr'?: boolean;
 }
 
 /**
@@ -44,12 +48,29 @@ export function builder(yargs: Argv): Argv<CreateArgv> {
       type: 'boolean',
       describe: 'Log AI requests for debugging purposes',
       default: false
+    })
+    .option('no-pr', {
+      type: 'boolean',
+      describe: 'Skip creating a PR, only optimize commit messages',
+      default: false
+    })
+    .option('provider', {
+      type: 'string',
+      describe: 'LLM provider to use (e.g., openai, ollama)',
+      default: config.llmProvider
+    })
+    .option('model', {
+      type: 'string',
+      describe: 'LLM model to use (e.g., gpt-3.5-turbo, gpt-4)',
+      default: config.model
     });
 }
 
 // Define global variables for confirm and logRequest
 let globalConfirm: (message: string, options?: PromptOptions) => Promise<unknown>;
 let globalLogRequest: boolean = false;
+let model: string;
+let provider: LLMProvider;
 
 // Initialize global variables
 export function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
@@ -62,6 +83,8 @@ export function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
   };
 
   globalLogRequest = argv['log-request'] ?? false;
+  provider = argv.provider as LLMProvider;
+  model = argv.model!;
 }
 
 // Modularized function to handle git operations with error handling
@@ -137,15 +160,14 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
       logger.info(green('Working directory is clean'));
     }
 
-    logger.info(yellow('Next step: Optimize existing commit messages'));
-    const proceedWithOptimize = await globalConfirm('Would you like to optimize your commit messages?');
-    if (proceedWithOptimize) {
-      await performGitOperation(
-        () => optimizeCommitMessages(git, upstreamBranch, globalConfirm),
-        'Failed to optimize commit messages'
-      );
-    } else {
-      logger.info(yellow('Skipping commit message optimization'));
+    await performGitOperation(
+      () => optimizeCommitMessages(git, upstreamBranch, globalConfirm),
+      'Failed to optimize commit messages'
+    );
+
+    if (argv['no-pr']) {
+      logger.info(yellow('Skipping branch creation and PR process as per --no-pr flag'));
+      return;
     }
 
     logger.info(yellow('Final step: Create a new branch and push PR to remote'));
@@ -331,7 +353,7 @@ async function handleUncommittedChanges(
       tempModified.push(`
 filename: ${file}
 diff changes: ${diff}
-____________=========================____________
+
 `);
     } catch (error) {
       logger.warn(yellow(`Failed to get diff for ${file}: ${(error as Error).message}`));
@@ -354,24 +376,20 @@ ____________=========================____________
 
   const commitPrompt = `
 
-Extra Instructions:
-- Provide a better commit message that clearly describes the change using the conventional commit format
-(type(scope): description). Types include: feat, fix, docs, style, refactor, perf, test, build, ci, chore.
-The message should be concise, clear, and follow best practices.
-
-Format your response as a JSON object with the following length and structure:
-- commitMessage: max 120 characters
-and the following structure:
+Provide a better multi-line commit message with summary and bullet points for all changes following the ## 1. Commit Message format in the prompt.
+Format your response as a JSON object with structure:
 {
-  "commitMessage": "type(scope): summary of changes detailed explanation of changes..."
+  "commitMessage": "type(scope): summary of changes detailed explanation of changes...\n bullet points of changes"
 }
-    Git diff changes are as follows:
-    ${tempModified.join('')}
+
+Git diff changes are as follows:
+${tempModified.join('')}
 
 `;
 
   logger.info(green('Sending changes to LLM for commit suggestion...'));
-  const res = await generateCompletion('ollama', {
+  const res = await generateCompletion(provider, {
+    model,
     logRequest: globalLogRequest,
     prompt: commitPrompt
   });
@@ -533,6 +551,13 @@ async function optimizeCommitMessages(
   }
 
   logger.info(green(`Found ${commits.all.length} commit(s) in the branch`));
+  logger.info(yellow('Next step: Optimize existing commit messages'));
+
+  const proceedWithOptimize = await globalConfirm('Would you like to optimize your commit messages?');
+  if (!proceedWithOptimize) {
+    logger.info(yellow('Skipping commit message optimization'));
+    return;
+  }
 
   // Only focus on the last commit for optimization
   const lastCommit = commits?.all?.[0];
@@ -666,7 +691,8 @@ ${fullDiff}
 `;
 
   logger.info(yellow(`Requesting commit message analysis from AI with comprehensive context...`));
-  const res = await generateCompletion('ollama', {
+  const res = await generateCompletion(provider, {
+    model,
     logRequest: globalLogRequest,
     prompt: promptMsg
   });
@@ -831,12 +857,15 @@ async function createAndPushPR(
   }
 
   const prPrompt = `
-  Exclude the following branches from suggestions: ${existingBranchNames}
+
+Exclude the following branches from suggestions: ${existingBranchNames}
+
 Format your response as a JSON object with the following length and structure:
-- suggestedBranchName: max 50 characters
-- prTitle: max 100 characters
-- prDescription: max 2000 characters
-and the following structure:
+- suggestedBranchName: max 50 characters alphanumeric, lowercase, and hyphenated.
+- prTitle: max 100 characters and follow the format prompt ## 2. Pull Request Title.
+- prDescription: max 2000 characters and follow the format prompt ## 3. Pull Request Description.
+
+Follow the structure:
 {
   "suggestedBranchName": "feature/descriptive-name",
   "prTitle": "type(scope): PR Title",
@@ -852,7 +881,8 @@ Full diff from ${upstreamBranch} to HEAD:
 ${fullDiff}
 `;
 
-  const res = await generateCompletion('ollama', {
+  const res = await generateCompletion(provider, {
+    model,
     logRequest: globalLogRequest,
     prompt: prPrompt
   });
