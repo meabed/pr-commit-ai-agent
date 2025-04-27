@@ -2,6 +2,8 @@
 export function getSystemPrompt() {
   return `You are a senior software architect and code reviewer. Analyze the provided git diff to generate the following structured analysis:
 
+Skip any sections or sub-section that are not relevant or not needed or not application or does not require changes to be mentioned.
+
 ## 1. Commit Message
 - Format: type(scope): concise summary of main functionality
   - Example: "feat(logs): implement log viewer with options to delete and view logs"
@@ -334,7 +336,7 @@ Categorize using specific prefixes with detailed scope:
 
 ## 8. Provide actionable feedback that addresses both immediate code quality and long-term maintainability. Use concrete examples when suggesting improvements.
 
-## 9. Use correct sentence case. Skip any sections or sub-section that aren't relevant or not needed or no application to the specific changes.
+## 9. Use correct sentence case.
 
 `;
 }

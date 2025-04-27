@@ -376,7 +376,7 @@ diff changes: ${diff}
 
   const commitPrompt = `
 
-Provide a better multi-line commit message with summary and bullet points following the ## 1. Commit Message format in the prompt.
+Provide a better multi-line commit message with summary and bullet points for all changes following the ## 1. Commit Message format in the prompt.
 Format your response as a JSON object with structure:
 {
   "commitMessage": "type(scope): summary of changes detailed explanation of changes...\n bullet points of changes"
@@ -861,7 +861,7 @@ async function createAndPushPR(
 Exclude the following branches from suggestions: ${existingBranchNames}
 
 Format your response as a JSON object with the following length and structure:
-- suggestedBranchName: max 50 characters
+- suggestedBranchName: max 50 characters alphanumeric, lowercase, and hyphenated.
 - prTitle: max 100 characters and follow the format prompt ## 2. Pull Request Title.
 - prDescription: max 2000 characters and follow the format prompt ## 3. Pull Request Description.
 
