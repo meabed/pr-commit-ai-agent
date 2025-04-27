@@ -1,8 +1,17 @@
 {
   "name": "pr-commit-ai-agent",
   "version": "0.0.1",
-  "description": "pr-commit-ai-agent",
+  "description": "An intelligent CLI tool leveraging AI to enhance Git workflows by generating high-quality commit messages and pull requests.",
   "keywords": [
+    "AI",
+    "CLI",
+    "commit messages",
+    "pull requests",
+    "Git workflow",
+    "OpenAI",
+    "Anthropic",
+    "Ollama",
+    "DeepSeek",
     "pr-commit-ai-agent",
     "coding-agent",
     "github-copilot",
