@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getSystemPrompt } from './prompts';
 import { tokenizeAndEstimateCost } from 'llm-cost';
 import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google';
-import { generateObject, jsonSchema } from 'ai';
+import { generateObject, GenerateObjectResult, jsonSchema } from 'ai';
 
 // Types and Interfaces
 export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama' | 'gemini';
@@ -30,7 +30,8 @@ interface LLMLogEntry {
   provider: LLMProvider;
   model: string;
   options: CompletionOptions;
-  response?: string;
+  response?: unknown;
+  text?: string;
   error?: string;
   executionTimeMs?: number;
   tokenUsage?: LLMCostEstimate;
@@ -423,7 +424,9 @@ async function deepseekGenerate(options: CompletionOptions): Promise<{ text: str
 /**
  * Generate a completion using Ollama
  */
-async function ollamaGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
+async function ollamaGenerate(
+  options: CompletionOptions
+): Promise<{ response: unknown; text: string; tokenUsage?: LLMCostEstimate }> {
   const model = options.model || config.model || 'llama2';
   const apiUrl = config.ollama?.baseURL || 'http://localhost:11434/api/generate';
 
@@ -479,7 +482,7 @@ async function ollamaGenerate(options: CompletionOptions): Promise<{ text: strin
     // Log combined input/output tokens and cost
     const tokenUsage = await logTokensAndCost(model, options.prompt, responseText);
 
-    return { text: responseText, tokenUsage };
+    return { response: data, text: responseText, tokenUsage };
   } catch (error) {
     throw new Error(`Ollama API error: ${(error as Error).message}`);
   }
@@ -488,7 +491,11 @@ async function ollamaGenerate(options: CompletionOptions): Promise<{ text: strin
 /**
  * Generate a completion using Google Gemini
  */
-async function geminiGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
+async function geminiGenerate(options: CompletionOptions): Promise<{
+  response: GenerateObjectResult<unknown>;
+  text: string;
+  tokenUsage: LLMCostEstimate | undefined;
+}> {
   if (!geminiClient) {
     throw new Error('Gemini client not initialized. Check your API key.');
   }
@@ -503,7 +510,7 @@ async function geminiGenerate(options: CompletionOptions): Promise<{ text: strin
 
   try {
     // Get the generative model
-    const { object } = await generateObject({
+    const response = await generateObject({
       model: geminiClient(model, {
         structuredOutputs: true
       }),
@@ -514,10 +521,11 @@ async function geminiGenerate(options: CompletionOptions): Promise<{ text: strin
       temperature: options.temperature || 0.1
     });
 
+    const object = response.object ?? {};
     // Log combined input/output tokens and cost
     const tokenUsage = await logTokensAndCost(model, options.prompt, JSON.stringify(object));
 
-    return { text: JSON.stringify(object), tokenUsage };
+    return { response, text: JSON.stringify(object), tokenUsage };
   } catch (error) {
     throw new Error(`Gemini API error: ${(error as Error).message}`);
   }
@@ -533,7 +541,7 @@ async function geminiGenerate(options: CompletionOptions): Promise<{ text: strin
 export const generateCompletion = async (
   provider: LLMProvider,
   options: CompletionOptions
-): Promise<{ text: string; requestId: string }> => {
+): Promise<{ response: unknown; text: string; requestId: string }> => {
   logger.info(yellow(`Generating completion using ${provider}...`));
 
   // Ensure clients are initialized
@@ -561,37 +569,43 @@ export const generateCompletion = async (
   };
 
   try {
-    let response = '';
+    let response: unknown = {};
+    let text = '';
     let tokenUsage;
 
     switch (provider) {
       case 'openai': {
         const openaiResult = await openaiGenerate(options);
         response = openaiResult.text;
+        text = openaiResult.text;
         tokenUsage = openaiResult.tokenUsage;
         break;
       }
       case 'anthropic': {
         const anthropicResult = await anthropicGenerate(options);
         response = anthropicResult.text;
+        text = anthropicResult.text;
         tokenUsage = anthropicResult.tokenUsage;
         break;
       }
       case 'deepseek': {
         const deepseekResult = await deepseekGenerate(options);
         response = deepseekResult.text;
+        text = deepseekResult.text;
         tokenUsage = deepseekResult.tokenUsage;
         break;
       }
       case 'ollama': {
         const ollamaResult = await ollamaGenerate(options);
-        response = ollamaResult.text;
+        response = ollamaResult.response;
+        text = ollamaResult.text;
         tokenUsage = ollamaResult.tokenUsage;
         break;
       }
       case 'gemini': {
         const geminiResult = await geminiGenerate(options);
-        response = geminiResult.text;
+        response = geminiResult.response;
+        text = geminiResult.text;
         tokenUsage = geminiResult.tokenUsage;
         break;
       }
@@ -601,6 +615,7 @@ export const generateCompletion = async (
 
     // Update log entry with response, execution time, and token usage
     logEntry.response = response;
+    logEntry.text = text;
     logEntry.executionTimeMs = Date.now() - startTime;
 
     if (tokenUsage) {
@@ -619,7 +634,7 @@ export const generateCompletion = async (
       });
     }
 
-    return { text: response, requestId };
+    return { text: text, response, requestId };
   } catch (error) {
     // Log error case
     logEntry.error = (error as Error).message;
