@@ -15,12 +15,6 @@ export const aliases = ['conf', 'c'];
 type ConfigAction = 'list' | 'set' | 'get' | 'reset' | 'exit';
 
 export async function handler() {
-  // Setup Ctrl+C handler
-  process.on('SIGINT', () => {
-    logger.info(yellow('\nConfiguration manager exited with Ctrl+C'));
-    process.exit(0);
-  });
-
   // Interactive mode
   logger.info(bold(blue('PR-Agent Configuration Manager')));
   logger.info(yellow('Current configuration path: ') + blue(configInstance.path));
@@ -42,10 +36,10 @@ function displayCurrentConfig() {
   // Global settings
   logger.info(yellow('Global Settings:'));
   logger.info(`  ${bold('LLM Provider:')} ${config.llmProvider}`);
-  logger.info(`  ${bold('Default Model:')} ${config.model}`);
+  logger.info(`  ${bold('Default Model:')} ${config.model || '(using provider default)'}`);
 
   // Provider-specific settings
-  const providers = ['openai', 'anthropic', 'deepseek', 'ollama'];
+  const providers = ['openai', 'anthropic', 'deepseek', 'ollama', 'gemini'];
 
   for (const provider of providers) {
     logger.info(yellow(`\n${provider.charAt(0).toUpperCase() + provider.slice(1)} Configuration:`));
@@ -71,15 +65,16 @@ async function configurationLoop() {
 
   while (!exit) {
     logger.info(bold(green('\n=== Configuration Options ===')));
-    logger.info('1. Set LLM provider (openai, anthropic, deepseek, ollama)');
+    logger.info('1. Set LLM provider (openai, anthropic, deepseek, ollama, gemini)');
     logger.info('2. Set default model');
     logger.info('3. Configure OpenAI settings');
     logger.info('4. Configure Anthropic settings');
     logger.info('5. Configure DeepSeek settings');
     logger.info('6. Configure Ollama settings');
-    logger.info('7. Reset all settings to defaults');
-    logger.info('8. Show current configuration values');
-    logger.info('9. Exit configuration');
+    logger.info('7. Configure Gemini settings');
+    logger.info('8. Reset all settings to defaults');
+    logger.info('9. Show current configuration values');
+    logger.info('10. Exit configuration');
 
     const choice = await logger.prompt(yellow('Select an option:'), {
       type: 'select',
@@ -90,11 +85,17 @@ async function configurationLoop() {
         '4. Configure Anthropic',
         '5. Configure DeepSeek',
         '6. Configure Ollama',
-        '7. Reset to defaults',
-        '8. Show current configuration',
-        '9. Exit'
+        '7. Configure Gemini',
+        '8. Reset to defaults',
+        '9. Show current configuration',
+        '10. Exit'
       ]
     });
+
+    if (typeof choice === 'undefined') {
+      exit = true;
+      return;
+    }
 
     switch (choice) {
       case '1. Set LLM provider':
@@ -115,13 +116,16 @@ async function configurationLoop() {
       case '6. Configure Ollama':
         await configureProvider('ollama');
         break;
-      case '7. Reset to defaults':
+      case '7. Configure Gemini':
+        await configureProvider('gemini');
+        break;
+      case '8. Reset to defaults':
         await resetConfig();
         break;
-      case '8. Show current configuration':
+      case '9. Show current configuration':
         displayCurrentConfig();
         break;
-      case '9. Exit':
+      case '10. Exit':
         exit = true;
         break;
     }
@@ -136,20 +140,72 @@ async function configurationLoop() {
 async function configureLLMProvider() {
   const provider = await logger.prompt(yellow('Select LLM provider:'), {
     type: 'select',
-    options: ['openai', 'anthropic', 'deepseek', 'ollama']
+    options: ['openai', 'anthropic', 'deepseek', 'ollama', 'gemini']
   });
 
   await performAction('set', 'llmProvider', provider);
+
+  // Suggest setting a model after changing provider
+  logger.info(yellow('Remember to set an appropriate model for this provider'));
+  const setModel = await logger.prompt(yellow('Would you like to set a default model now?'), {
+    type: 'confirm'
+  });
+
+  if (setModel) {
+    await configureDefaultModel(provider);
+  }
 }
 
 /**
  * Configure the default model
+ * @param provider - Optional provider to suggest models for
  */
-async function configureDefaultModel() {
-  const model = await logger.prompt(yellow('Enter default model name:'), {
-    type: 'text',
-    initial: config.model
-  });
+async function configureDefaultModel(provider?: string) {
+  const currentProvider = provider || config.llmProvider;
+  let suggestedModels: string[] = [];
+
+  // Suggest popular models based on the selected provider
+  switch (currentProvider) {
+    case 'openai':
+      suggestedModels = ['gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+      break;
+    case 'anthropic':
+      suggestedModels = ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
+      break;
+    case 'gemini':
+      suggestedModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'];
+      break;
+    case 'ollama':
+      suggestedModels = ['llama3', 'llama2', 'mistral', 'codellama', 'qwen2.5-coder'];
+      break;
+    case 'deepseek':
+      suggestedModels = ['deepseek-coder', 'deepseek-chat'];
+      break;
+  }
+
+  // Allow user to select from suggested models or enter their own
+  let model;
+  if (suggestedModels.length > 0) {
+    const modelOptions = [...suggestedModels, 'Enter custom model name'];
+    const selectedOption = await logger.prompt(yellow('Select or enter model name:'), {
+      type: 'select',
+      options: modelOptions
+    });
+
+    if (selectedOption === 'Enter custom model name') {
+      model = await logger.prompt(yellow('Enter custom model name:'), {
+        type: 'text',
+        initial: config.model
+      });
+    } else {
+      model = selectedOption;
+    }
+  } else {
+    model = await logger.prompt(yellow('Enter model name:'), {
+      type: 'text',
+      initial: config.model
+    });
+  }
 
   await performAction('set', 'model', model);
 }
@@ -166,15 +222,49 @@ async function configureProvider(provider: string) {
   for (const [key, value] of Object.entries(providerConfig)) {
     const displayValue = key.toLowerCase().includes('apikey') ? (value ? '********' : '') : value;
 
-    const newValue = await logger.prompt(yellow(`Enter ${key} (leave empty to keep current):`), {
-      type: 'text',
-      initial: displayValue
-    });
+    // Special handling for base URL
+    if (key === 'baseURL' && provider === 'ollama') {
+      const options = ['http://localhost:11434/api/generate', 'http://localhost:11434/api/chat', 'Enter custom URL'];
 
-    // Only update if user entered a new value
-    if (newValue !== displayValue && newValue !== '') {
-      await performAction('set', `${provider}.${key}`, newValue);
+      const selectedOption = await logger.prompt(yellow(`Select ${key}:`), {
+        type: 'select',
+        options,
+        initial: options.includes(value) ? value : options[0]
+      });
+
+      const newValue =
+        selectedOption === 'Enter custom URL'
+          ? await logger.prompt(yellow('Enter custom URL:'), {
+              type: 'text',
+              initial: value
+            })
+          : selectedOption;
+
+      if (newValue !== value && newValue !== '') {
+        await performAction('set', `${provider}.${key}`, newValue);
+      }
+    } else {
+      // Standard prompt for other settings
+      const newValue = await logger.prompt(yellow(`Enter ${key} (leave empty to keep current):`), {
+        type: 'text',
+        initial: displayValue
+      });
+
+      // Only update if user entered a new value
+      if (newValue !== displayValue && newValue !== '') {
+        await performAction('set', `${provider}.${key}`, newValue);
+      }
     }
+  }
+
+  // After configuring a provider, offer to set it as default
+  const makeDefault = await logger.prompt(yellow(`Set ${provider} as your default LLM provider?`), {
+    type: 'confirm'
+  });
+
+  if (makeDefault) {
+    await performAction('set', 'llmProvider', provider);
+    logger.info(green(`${provider.charAt(0).toUpperCase() + provider.slice(1)} set as default provider.`));
   }
 }
 

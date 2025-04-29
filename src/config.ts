@@ -5,12 +5,12 @@ import Conf from 'conf';
 const schema = {
   llmProvider: {
     type: 'string',
-    enum: ['openai', 'anthropic', 'deepseek', 'ollama'],
+    enum: ['openai', 'anthropic', 'deepseek', 'ollama', 'gemini'],
     default: 'openai'
   },
   model: {
     type: 'string',
-    default: 'gpt-3.5-turbo'
+    default: ''
   },
   openai: {
     type: 'object',
@@ -32,11 +32,6 @@ const schema = {
       apiKey: {
         type: 'string',
         default: ''
-      },
-      baseURL: {
-        type: 'string',
-        format: 'uri',
-        default: 'https://api.anthropic.com/v1'
       }
     }
   },
@@ -60,8 +55,17 @@ const schema = {
       baseURL: {
         type: 'string',
         format: 'uri',
-        default: 'http://localhost:11434/api/chat'
+        default: 'http://localhost:11434/api/generate'
       },
+      apiKey: {
+        type: 'string',
+        default: ''
+      }
+    }
+  },
+  gemini: {
+    type: 'object',
+    properties: {
       apiKey: {
         type: 'string',
         default: ''
@@ -96,9 +100,6 @@ export function initializeConfig() {
   if (process.env.ANTHROPIC_API_KEY) {
     configInstance.set('anthropic.apiKey', process.env.ANTHROPIC_API_KEY);
   }
-  if (process.env.ANTHROPIC_BASE_URL) {
-    configInstance.set('anthropic.baseURL', process.env.ANTHROPIC_BASE_URL);
-  }
 
   // DeepSeek configuration
   if (process.env.DEEPSEEK_API_KEY) {
@@ -115,6 +116,11 @@ export function initializeConfig() {
   if (process.env.OLLAMA_BASE_URL) {
     configInstance.set('ollama.baseURL', process.env.OLLAMA_BASE_URL);
   }
+
+  // Gemini configuration
+  if (process.env.GEMINI_API_KEY) {
+    configInstance.set('gemini.apiKey', process.env.GEMINI_API_KEY);
+  }
 }
 
 // Initialize with environment variables
@@ -129,8 +135,7 @@ export const config = {
     baseURL: configInstance.get('openai.baseURL') as string
   },
   anthropic: {
-    apiKey: configInstance.get('anthropic.apiKey') as string,
-    baseURL: configInstance.get('anthropic.baseURL') as string
+    apiKey: configInstance.get('anthropic.apiKey') as string
   },
   deepseek: {
     apiKey: configInstance.get('deepseek.apiKey') as string,
@@ -139,5 +144,8 @@ export const config = {
   ollama: {
     baseURL: configInstance.get('ollama.baseURL') as string,
     apiKey: configInstance.get('ollama.apiKey') as string
+  },
+  gemini: {
+    apiKey: configInstance.get('gemini.apiKey') as string
   }
 };
