@@ -28,6 +28,7 @@ interface CreateArgv {
   provider?: string;
   model?: string;
   pr?: boolean;
+  draft?: boolean; // <-- Add draft option
 }
 
 /**
@@ -63,6 +64,11 @@ export function builder(yargs: Argv): Argv<CreateArgv> {
       type: 'string',
       describe: 'LLM model to use (e.g., gpt-3.5-turbo, gpt-4)',
       default: config.model
+    })
+    .option('draft', {
+      type: 'boolean',
+      describe: 'Create the PR as a draft',
+      default: false
     });
 }
 
@@ -178,7 +184,7 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
     }
 
     await performGitOperation(
-      () => createAndPushPR(git, upstreamBranch, globalConfirm),
+      () => createAndPushPR(git, upstreamBranch, argv?.draft, globalConfirm),
       'Failed to create and push PR'
     );
   } catch (e) {
@@ -776,12 +782,14 @@ Reason for improvement: ${analysis.reason}
  *
  * @param git - SimpleGit instance for git operations
  * @param upstreamBranch - Name of the upstream branch to target for the PR
+ * @param draft - Flag indicating whether to create the PR as a draft
  * @param confirm - Function to handle confirmations (respects --yes flag)
  * @returns Promise that resolves when PR creation is complete or canceled
  */
 async function createAndPushPR(
   git: SimpleGit,
   upstreamBranch: string,
+  draft: boolean | undefined,
   confirm: (message: string, options?: PromptOptions) => Promise<unknown>
 ) {
   logger.info(green('Preparing to create a new branch and PR'));
@@ -979,7 +987,8 @@ Branch name: ${prData.suggestedBranchName}
 
           logger.info(yellow('Creating PR using GitHub CLI...'));
           try {
-            // Capture the output from gh pr create command
+            // Add draft flag if argv.draft is true
+            const draftFlag = draft === true ? ['--draft'] : [];
             const { stdout } = await execa('gh', [
               'pr',
               'create',
@@ -988,7 +997,8 @@ Branch name: ${prData.suggestedBranchName}
               '--body',
               prData.prDescription,
               '--base',
-              upstreamTarget
+              upstreamTarget,
+              ...draftFlag
             ]);
 
             // Extract PR URL from output or get it using gh pr view
