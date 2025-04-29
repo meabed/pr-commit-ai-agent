@@ -155,7 +155,7 @@ ggpr create
 | --------------- | ----- | --------------------------------------------------------------- |
 | `--yes`         | `-y`  | Auto-confirm all prompts                                        |
 | `--log-request` | `-l`  | Log LLM API requests for debugging                              |
-| `--skip-pr`       |       | Generate commit description and commit only without creating PR |
+| `--skip-pr`     |       | Generate commit description and commit only without creating PR |
 
 ---
 
