@@ -114,7 +114,6 @@ Categorize using specific prefixes with detailed scope:
 
 ## 5. Provide actionable feedback that addresses both immediate code quality and long-term maintainability. Use concrete examples when suggesting improvements.
 
-## 6. Use correct sentence case.
-
+## 6. Use correct sentence case  Make sure the commit message and PR title are clear and concise, and follow the provided guidelines and follows @semantic-release/commit-analyzer angular convention.
 `;
 }
