@@ -71,7 +71,7 @@ export LLM_PROVIDER=openai
 export OPENAI_API_KEY=your_key_here
 
 # Or pass inline for a single command
-LLM_PROVIDER=ollama MODEL=qwen2.5-coder OLLAMA_BASE_URL=http://0.0.0.0:11434/api/generate ggpr create
+LLM_PROVIDER=ollama MODEL=qwen2.5-coder OLLAMA_BASE_URL=http://0.0.0.0:11434/api/generate ggpr
 ```
 
 ### Option 3: Configuration File
@@ -99,22 +99,22 @@ Guides you through creating AI-enhanced commits, optimizing messages, and creati
 
 ```bash
 # Basic usage (interactive)
-ggpr create
-
-# Or just:
 ggpr
 
+# Or just:
+ggpr create
+
 # Auto-confirm all prompts
-ggpr create --yes
+ggpr --yes
 
 # Log all LLM requests for debugging
-ggpr create --log-request
+ggpr --log-request
 
 # Combine flags
-ggpr create --yes --log-request
+ggpr --yes --log-request
 
-# Skip PR creation
-ggpr create --skip-pr
+# PR creation
+ggpr --pr
 ```
 
 ### Info Command
@@ -139,23 +139,25 @@ ggpr config
 
 ## 📚 Command Reference
 
-### Create Command
+### Create Command (default)
 
 The `create` command is the primary command for generating AI-enhanced commits and pull requests. It guides you through the process of creating commit messages, optimizing them, and generating pull requests.
 
 #### Usage
 
 ```bash
+ggpr 
+# or
 ggpr create
 ```
 
 #### Options
 
-| Flag            | Alias | Description                                                     |
-| --------------- | ----- | --------------------------------------------------------------- |
-| `--yes`         | `-y`  | Auto-confirm all prompts                                        |
-| `--log-request` | `-l`  | Log LLM API requests for debugging                              |
-| `--skip-pr`     |       | Generate commit description and commit only without creating PR |
+| Flag            | Alias | Description                                                       |
+|-----------------| ----- |-------------------------------------------------------------------|
+| `--yes`         | `-y`  | Auto-confirm all prompts                                          |
+| `--log-request` | `-l`  | Log LLM API requests for debugging                                |
+| `--pr`          |       | Generate commit description and commit and branch and create a PR |
 
 ---
 

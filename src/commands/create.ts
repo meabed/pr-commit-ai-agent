@@ -27,7 +27,7 @@ interface CreateArgv {
   'log-request'?: boolean;
   provider?: string;
   model?: string;
-  'skip-pr'?: boolean;
+  pr?: boolean;
 }
 
 /**
@@ -49,9 +49,9 @@ export function builder(yargs: Argv): Argv<CreateArgv> {
       describe: 'Log AI requests for debugging purposes',
       default: false
     })
-    .option('skip-pr', {
+    .option('pr', {
       type: 'boolean',
-      describe: 'Skip creating a PR, only optimize commit messages',
+      describe: 'Create a branch and PR',
       default: false
     })
     .option('provider', {
@@ -165,8 +165,8 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
       'Failed to optimize commit messages'
     );
 
-    if (argv['skip-pr']) {
-      logger.info(yellow('Skipping branch creation and PR process as per --skip-pr flag'));
+    if (!argv?.pr) {
+      logger.info(yellow('Skipping PR creation as --pr flag is not set'));
       return;
     }
 
@@ -280,7 +280,6 @@ async function getUpstreamBranch(
     });
 
     if (!targetBranch) {
-      logger.error(red('No branch selected.'));
       throw new Error('No branch selected');
     }
 
