@@ -114,7 +114,7 @@ ggpr create --log-request
 ggpr create --yes --log-request
 
 # Skip PR creation
-ggpr create --no-pr
+ggpr create --skip-pr
 ```
 
 ### Info Command
@@ -144,16 +144,18 @@ ggpr config
 The `create` command is the primary command for generating AI-enhanced commits and pull requests. It guides you through the process of creating commit messages, optimizing them, and generating pull requests.
 
 #### Usage
+
 ```bash
 ggpr create
 ```
 
 #### Options
+
 | Flag            | Alias | Description                                                     |
 | --------------- | ----- | --------------------------------------------------------------- |
 | `--yes`         | `-y`  | Auto-confirm all prompts                                        |
 | `--log-request` | `-l`  | Log LLM API requests for debugging                              |
-| `--no-pr`       |       | Generate commit description and commit only without creating PR |
+| `--skip-pr`     |       | Generate commit description and commit only without creating PR |
 
 ---
 
@@ -162,14 +164,16 @@ ggpr create
 The `config` command allows you to view and modify the configuration settings for GGPR. You can use it interactively or modify the configuration file directly.
 
 #### Usage
+
 ```bash
 ggpr config
 ```
 
 #### Options
-| Flag        | Alias | Description           |
-| ----------- | ----- | --------------------- |
-| `--help`    | `-h`  | Show help information |
+
+| Flag     | Alias | Description           |
+| -------- | ----- | --------------------- |
+| `--help` | `-h`  | Show help information |
 
 ---
 
@@ -178,14 +182,16 @@ ggpr config
 The `logs` command provides access to the logs of previous LLM requests and responses. This is useful for debugging or reviewing past interactions.
 
 #### Usage
+
 ```bash
 ggpr logs
 ```
 
 #### Options
-| Flag        | Alias | Description           |
-| ----------- | ----- | --------------------- |
-| `--help`    | `-h`  | Show help information |
+
+| Flag     | Alias | Description           |
+| -------- | ----- | --------------------- |
+| `--help` | `-h`  | Show help information |
 
 ---
 
@@ -194,15 +200,17 @@ ggpr logs
 The `info` command displays information about the current repository, including its status and configuration.
 
 #### Usage
+
 ```bash
 ggpr info
 ```
 
 #### Options
-| Flag        | Alias | Description              |
-| ----------- | ----- | ------------------------ |
-| `--full`    |       | Show detailed information|
-| `--help`    | `-h`  | Show help information    |
+
+| Flag     | Alias | Description               |
+| -------- | ----- | ------------------------- |
+| `--full` |       | Show detailed information |
+| `--help` | `-h`  | Show help information     |
 
 ---
 
