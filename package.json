@@ -1,6 +1,6 @@
 {
   "name": "pr-commit-ai-agent",
-  "version": "0.0.1",
+  "version": "1.0.0-develop.4",
   "description": "A CLI tool powered by AI to streamline Git workflows by generating commit messages, branch names, and pull requests.",
   "keywords": [
     "AI",
@@ -61,7 +61,7 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/google": "^1.2.13",
+    "@ai-sdk/google": "^1.2.14",
     "@ai-sdk/provider": "1.1.3",
     "@anthropic-ai/sdk": "0.40.1",
     "@eslint/js": "9.25.1",
