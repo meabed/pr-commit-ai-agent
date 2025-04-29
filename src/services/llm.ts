@@ -10,9 +10,11 @@ import * as os from 'node:os';
 import { v4 as uuidv4 } from 'uuid';
 import { getSystemPrompt } from './prompts';
 import { tokenizeAndEstimateCost } from 'llm-cost';
+import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google';
+import { generateObject, jsonSchema } from 'ai';
 
 // Types and Interfaces
-export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama';
+export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama' | 'gemini';
 
 export interface CompletionOptions {
   prompt: string;
@@ -98,6 +100,7 @@ type OllamaGenerateOptions = {
 // Clients and configuration
 let openaiClient: OpenAI | null = null;
 let anthropicClient: Anthropic | null = null;
+let geminiClient: GoogleGenerativeAIProvider | null = null;
 export const logDir = path.join(os.homedir(), '.llm-logs');
 
 /**
@@ -122,6 +125,16 @@ function initializeClients(): void {
       logger.debug('Anthropic client initialized successfully');
     } else {
       logger.debug('Skipping Anthropic client initialization: No API key provided');
+    }
+
+    if (config.gemini?.apiKey) {
+      geminiClient = createGoogleGenerativeAI({
+        apiKey: config.gemini.apiKey
+      });
+
+      logger.debug('Google Gemini client initialized successfully');
+    } else {
+      logger.debug('Skipping Google Gemini client initialization: No API key provided');
     }
   } catch (error) {
     logger.error(red(`Failed to initialize LLM clients: ${(error as Error).message}`));
@@ -185,6 +198,8 @@ function getModelForProvider(provider: LLMProvider, customModel?: string): strin
       return config.model || 'deepseek-chat';
     case 'ollama':
       return config.model || 'llama2';
+    case 'gemini':
+      return config.model || 'gemini-1.5-pro';
     default:
       return 'unknown';
   }
@@ -471,6 +486,44 @@ async function ollamaGenerate(options: CompletionOptions): Promise<{ text: strin
 }
 
 /**
+ * Generate a completion using Google Gemini
+ */
+async function geminiGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
+  if (!geminiClient) {
+    throw new Error('Gemini client not initialized. Check your API key.');
+  }
+
+  const model = options.model || config.model || 'gemini-1.5-pro';
+  logger.info(yellow(`Making Gemini completion request with model: ${model}`));
+
+  // Log input tokens
+  await logTokensAndCost(model, options.prompt);
+
+  logger.debug(`Gemini request params: temperature=${options.temperature || 0.1}, model=${model}`);
+
+  try {
+    // Get the generative model
+    const { object } = await generateObject({
+      model: geminiClient(model, {
+        structuredOutputs: true
+      }),
+      schema: jsonSchema({
+        type: 'object'
+      }),
+      prompt: options.prompt,
+      temperature: options.temperature || 0.1
+    });
+
+    // Log combined input/output tokens and cost
+    const tokenUsage = await logTokensAndCost(model, options.prompt, JSON.stringify(object));
+
+    return { text: JSON.stringify(object), tokenUsage };
+  } catch (error) {
+    throw new Error(`Gemini API error: ${(error as Error).message}`);
+  }
+}
+
+/**
  * Main completion function to generate text from any supported LLM provider
  *
  * @param provider The LLM provider to use
@@ -484,7 +537,7 @@ export const generateCompletion = async (
   logger.info(yellow(`Generating completion using ${provider}...`));
 
   // Ensure clients are initialized
-  if (!openaiClient && !anthropicClient) {
+  if (!openaiClient && !anthropicClient && !geminiClient) {
     initializeClients();
   }
 
@@ -534,6 +587,12 @@ export const generateCompletion = async (
         const ollamaResult = await ollamaGenerate(options);
         response = ollamaResult.text;
         tokenUsage = ollamaResult.tokenUsage;
+        break;
+      }
+      case 'gemini': {
+        const geminiResult = await geminiGenerate(options);
+        response = geminiResult.text;
+        tokenUsage = geminiResult.tokenUsage;
         break;
       }
       default:

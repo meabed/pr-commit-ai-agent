@@ -58,6 +58,11 @@ async function viewLogsLoop(): Promise<void> {
       options
     });
 
+    if (typeof selection === 'undefined') {
+      exitLoop = true;
+      continue;
+    }
+
     // Handle special options
     if (selection === 'Exit log viewer') {
       exitLoop = true;
