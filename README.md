@@ -114,7 +114,7 @@ ggpr create --log-request
 ggpr create --yes --log-request
 
 # Skip PR creation
-ggpr create --no-pr
+ggpr create --skip-pr
 ```
 
 ### Info Command
@@ -155,7 +155,7 @@ ggpr create
 | --------------- | ----- | --------------------------------------------------------------- |
 | `--yes`         | `-y`  | Auto-confirm all prompts                                        |
 | `--log-request` | `-l`  | Log LLM API requests for debugging                              |
-| `--no-pr`       |       | Generate commit description and commit only without creating PR |
+| `--skip-pr`       |       | Generate commit description and commit only without creating PR |
 
 ---
 

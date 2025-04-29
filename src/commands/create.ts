@@ -27,7 +27,7 @@ interface CreateArgv {
   'log-request'?: boolean;
   provider?: string;
   model?: string;
-  'no-pr'?: boolean;
+  'skip-pr'?: boolean;
 }
 
 /**
@@ -49,7 +49,7 @@ export function builder(yargs: Argv): Argv<CreateArgv> {
       describe: 'Log AI requests for debugging purposes',
       default: false
     })
-    .option('no-pr', {
+    .option('skip-pr', {
       type: 'boolean',
       describe: 'Skip creating a PR, only optimize commit messages',
       default: false
@@ -165,8 +165,8 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
       'Failed to optimize commit messages'
     );
 
-    if (argv['no-pr']) {
-      logger.info(yellow('Skipping branch creation and PR process as per --no-pr flag'));
+    if (argv['skip-pr']) {
+      logger.info(yellow('Skipping branch creation and PR process as per --skip-pr flag'));
       return;
     }
 
