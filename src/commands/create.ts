@@ -73,7 +73,7 @@ let model: string;
 let provider: LLMProvider;
 
 // Initialize global variables
-export function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
+function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
   globalConfirm = async (message: string, options: PromptOptions = { type: 'confirm' }) => {
     if (argv.yes) {
       logger.info(yellow(`[Auto-confirmed] ${message}`));
@@ -442,7 +442,7 @@ ${commitData.commitMessage}
   } catch (e) {
     logger.debug('Raw response:', res);
     logger.error(red(`Failed to parse LLM response as JSON: ${(e as Error).message}`));
-    throw new Error('Invalid LLM response format');
+    process.exit(0);
   }
 
   return commitData;
