@@ -28,7 +28,7 @@ interface CreateArgv {
   provider?: string;
   model?: string;
   pr?: boolean;
-  draft?: boolean; // <-- Add draft option
+  draft?: boolean;
 }
 
 /**
