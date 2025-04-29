@@ -146,7 +146,7 @@ The `create` command is the primary command for generating AI-enhanced commits a
 #### Usage
 
 ```bash
-ggpr 
+ggpr
 # or
 ggpr create
 ```
@@ -154,7 +154,7 @@ ggpr create
 #### Options
 
 | Flag            | Alias | Description                                                       |
-|-----------------| ----- |-------------------------------------------------------------------|
+| --------------- | ----- | ----------------------------------------------------------------- |
 | `--yes`         | `-y`  | Auto-confirm all prompts                                          |
 | `--log-request` | `-l`  | Log LLM API requests for debugging                                |
 | `--pr`          |       | Generate commit description and commit and branch and create a PR |
