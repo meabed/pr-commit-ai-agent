@@ -12,6 +12,8 @@ import { getSystemPrompt } from './prompts';
 import { tokenizeAndEstimateCost } from 'llm-cost';
 import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google';
 import { generateObject, GenerateObjectResult, jsonSchema } from 'ai';
+import { type ChatCompletion } from 'openai/resources/chat/completions/completions';
+import { type Response } from 'openai/resources/responses/responses';
 
 // Types and Interfaces
 export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama' | 'gemini';
@@ -266,7 +268,9 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
 /**
  * Generate a completion using OpenAI
  */
-async function openaiGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
+async function openaiGenerate(
+  options: CompletionOptions
+): Promise<{ text: string; response: unknown; tokenUsage?: LLMCostEstimate }> {
   if (!openaiClient) {
     throw new Error('OpenAI client not initialized. Check your API key.');
   }
@@ -281,25 +285,53 @@ async function openaiGenerate(options: CompletionOptions): Promise<{ text: strin
     `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
   );
 
+  const clientBaseUrl = openaiClient.baseURL;
+  let response: ChatCompletion | Response;
+  let outputText = '';
   try {
-    const response = await openaiClient.responses.create({
-      model,
-      input: [
-        {
-          role: 'user',
-          content: options.prompt,
-          type: 'message'
-        }
-      ],
-      temperature: options.temperature || 0.1
-    });
+    if (!clientBaseUrl.includes('api.openai.com')) {
+      // use chat completion for non-openai.com base URLs like openrouter.ai
+      response = await openaiClient.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: options.prompt
+          }
+        ],
 
-    const outputText = response.output_text || '';
+        temperature: options.temperature || 0.1,
+        response_format: { type: 'json_object' }
+      });
 
+      outputText = response?.choices?.[0]?.message?.content || '';
+    } else {
+      response = await openaiClient.responses.create({
+        model,
+        input: [
+          {
+            role: 'user',
+            content: options.prompt,
+            type: 'message'
+          }
+        ],
+        temperature: options.temperature || 0.1
+      });
+
+      outputText = response.output_text || '';
+    }
     // Log combined input/output tokens and cost
     const tokenUsage = await logTokensAndCost(model, options.prompt, outputText);
 
-    return { text: outputText, tokenUsage };
+    // if the beginning of the output text ```json\n and end is \n``` remove both
+    if (outputText.startsWith('```json\n')) {
+      outputText = outputText.substring(8);
+    }
+    if (outputText.endsWith('\n```')) {
+      outputText = outputText.substring(0, outputText.length - 4);
+    }
+
+    return { text: outputText, response, tokenUsage };
   } catch (error) {
     throw new Error(`OpenAI API error: ${(error as Error).message}`);
   }
@@ -308,7 +340,9 @@ async function openaiGenerate(options: CompletionOptions): Promise<{ text: strin
 /**
  * Generate a completion using Anthropic
  */
-async function anthropicGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
+async function anthropicGenerate(
+  options: CompletionOptions
+): Promise<{ text: string; response: unknown; tokenUsage?: LLMCostEstimate }> {
   if (!anthropicClient) {
     throw new Error('Anthropic client not initialized. Check your API key.');
   }
@@ -348,7 +382,7 @@ async function anthropicGenerate(options: CompletionOptions): Promise<{ text: st
     // Log combined input/output tokens and cost
     const tokenUsage = await logTokensAndCost(model, options.prompt, responseText);
 
-    return { text: responseText, tokenUsage };
+    return { text: responseText, response, tokenUsage };
   } catch (error) {
     throw new Error(`Anthropic API error: ${(error as Error).message}`);
   }
@@ -357,7 +391,9 @@ async function anthropicGenerate(options: CompletionOptions): Promise<{ text: st
 /**
  * Generate a completion using DeepSeek
  */
-async function deepseekGenerate(options: CompletionOptions): Promise<{ text: string; tokenUsage?: LLMCostEstimate }> {
+async function deepseekGenerate(
+  options: CompletionOptions
+): Promise<{ text: string; response: unknown; tokenUsage?: LLMCostEstimate }> {
   if (!config.deepseek?.apiKey) {
     throw new Error('DeepSeek API key not configured.');
   }
@@ -415,7 +451,7 @@ async function deepseekGenerate(options: CompletionOptions): Promise<{ text: str
     // Log combined input/output tokens and cost
     const tokenUsage = await logTokensAndCost(model, options.prompt, responseText);
 
-    return { text: responseText, tokenUsage };
+    return { text: responseText, response, tokenUsage };
   } catch (error) {
     throw new Error(`DeepSeek API error: ${(error as Error).message}`);
   }
@@ -576,21 +612,21 @@ export const generateCompletion = async (
     switch (provider) {
       case 'openai': {
         const openaiResult = await openaiGenerate(options);
-        response = openaiResult.text;
+        response = openaiResult.response;
         text = openaiResult.text;
         tokenUsage = openaiResult.tokenUsage;
         break;
       }
       case 'anthropic': {
         const anthropicResult = await anthropicGenerate(options);
-        response = anthropicResult.text;
+        response = anthropicResult.response;
         text = anthropicResult.text;
         tokenUsage = anthropicResult.tokenUsage;
         break;
       }
       case 'deepseek': {
         const deepseekResult = await deepseekGenerate(options);
-        response = deepseekResult.text;
+        response = deepseekResult.response;
         text = deepseekResult.text;
         tokenUsage = deepseekResult.tokenUsage;
         break;

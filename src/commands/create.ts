@@ -118,6 +118,17 @@ async function performGitOperation<T>(operation: () => Promise<T>, errorMessage:
 export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
   initializeGlobals(argv);
 
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-expect-error
+  const baseUrl = config?.[provider]?.baseURL;
+  // Log the current model, provider, and API URL
+  logger.info(green('Configuration:'));
+  logger.info(`  Provider: ${provider}`);
+  logger.info(`  Model: ${model}`);
+  if (baseUrl) {
+    logger.info(`  API URL: ${baseUrl}`);
+  }
+
   const ready = await globalConfirm(`Are you ready to create an AI PR?`);
   //
   if (!ready) return;
