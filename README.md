@@ -1,10 +1,13 @@
 # GGPR - PR & Commit AI Assistant
 
-GGPR is a smart CLI tool leveraging AI to enhance Git workflows by generating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
+GGPR is a AI CLI tool leveraging AI to enhance Git workflows by generating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
 
 [![NPM Version](https://img.shields.io/npm/v/pr-commit-ai-agent.svg)](https://www.npmjs.com/package/pr-commit-ai-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml)
+
+## Don't waste time writing commit messages, creating PRs, or branch names. Let AI do it for you!
+![img.png](assets/simple01.png)
 
 [![demo](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf.svg)](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf)
 
@@ -36,21 +39,19 @@ npm install -g pr-commit-ai-agent
 
 # Or with pnpm (recommended)
 pnpm add -g pr-commit-ai-agent
+
+# install gh cli https://cli.github.com/
+brew install gh
+
 ```
 
-### Development Installation (for contributors)
-
-```bash
-# Clone the repository
-git clone https://github.com/meabed/pr-commit-ai-agent.git
-cd pr-commit-ai-agent
-
-# Install dependencies
-pnpm install
-
-# Link the package globally
-pnpm link --global
-```
+### Get your API keys from any of the following providers:
+- [OpenRouter — Free Credits and Models available](https://www.openrouter.ai/)
+- [OpenAI](https://platform.openai.com/signup)
+- [Anthropic](https://www.anthropic.com/)
+- [Google](https://ai.google.dev/gemini-api/docs/api-key)
+- [DeepSeek](https://deepseek.ai/)
+- [Ollama](https://ollama.com/) (local models)
 
 ## ⚙️ Configuration
 

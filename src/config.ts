@@ -83,7 +83,7 @@ export const configInstance = new Conf({
 // Initialize with environment variables or use existing stored values
 export function initializeConfig() {
   if (process.env.LLM_PROVIDER) {
-    configInstance.set('llmProvider', process.env.LLM_PROVIDER);
+    configInstance.set('llmProvider', process.env.LLM_PROVIDER.toLowerCase());
   }
   if (process.env.MODEL) {
     configInstance.set('model', process.env.MODEL);
