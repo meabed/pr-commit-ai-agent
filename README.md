@@ -6,7 +6,16 @@ GGPR is a AI CLI tool leveraging AI to enhance Git workflows by generating high-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml)
 
+---
+
+<p align="center">
+  <a href="https://github.com/meabed/pr-commit-ai-agent/pulls?q=is%3Apr+is%3Aclosed">See PR and commits in the repo in action</a>
+</p>
+
+---
+
 ## Don't waste time writing commit messages, creating PRs, or branch names. Let AI do it for you!
+
 ![img.png](assets/simple01.png)
 
 [![demo](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf.svg)](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf)
@@ -46,6 +55,7 @@ brew install gh
 ```
 
 ### Get your API keys from any of the following providers:
+
 - [OpenRouter — Free Credits and Models available](https://www.openrouter.ai/)
 - [OpenAI](https://platform.openai.com/signup)
 - [Anthropic](https://www.anthropic.com/)
