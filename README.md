@@ -1,6 +1,6 @@
-# GGPR - PR & Commit AI Assistant
+# 🚀 GGPR - PR & Commit AI Assistant
 
-GGPR is a AI CLI tool leveraging AI to enhance Git workflows by generating high-quality commit messages and pull requests. It helps developers maintain better documentation of code changes, follow best practices, and create more descriptive PRs with minimal effort.
+GGPR is an AI-powered CLI tool that **supercharges your Git workflow** by generating high-quality commit messages, branch names, and pull requests. Save time, improve documentation, and let AI handle the tedious parts of your development process! 🎉
 
 [![NPM Version](https://img.shields.io/npm/v/pr-commit-ai-agent.svg)](https://www.npmjs.com/package/pr-commit-ai-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -9,38 +9,51 @@ GGPR is a AI CLI tool leveraging AI to enhance Git workflows by generating high-
 ---
 
 <p align="center">
-  <a href="https://github.com/meabed/pr-commit-ai-agent/pulls?q=is%3Apr+is%3Aclosed">See PR and commits in the repo in action</a>
+  <a href="https://github.com/meabed/pr-commit-ai-agent/pulls?q=is%3Apr+is%3Aclosed">✨ See GGPR in action with real PRs and commits</a>
 </p>
 
 ---
 
-## Don't waste time writing commit messages, creating PRs, or branch names. Let AI do it for you!
+## 🌟 Why GGPR?
+
+- 🕒 **Save Time**: No more writing commit messages or PR descriptions manually.
+- 🧠 **AI-Powered**: Generate semantic, high-quality commit messages and PRs.
+- 🔧 **Customizable**: Tailor prompts and workflows to your team's needs.
+- 🌍 **Multiple AI Providers**: Choose from OpenAI, Anthropic, Ollama, DeepSeek, and more.
+- 🔒 **Privacy-Friendly**: Use local models with Ollama for complete control.
 
 ![img.png](assets/simple01.png)
 
+---
+
 [![demo](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf.svg)](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf)
 
-## 🚀 Features
+---
 
-- **AI-Generated Commit Messages** - Create semantic commits that follow best practices
-- **Commit Message Optimization** - Improve existing messages with AI suggestions
-- **Smart Branch Names** - Generate descriptive branch names based on your changes
-- **Automated PR Creation** - Generate PR titles, descriptions, and create them automatically
-- **Multiple LLM Support** - Choose from OpenAI, Anthropic, Ollama, or DeepSeek
-- **Local AI Integration** - Use with local models through Ollama for privacy
-- **Customizable Workflows** - Configure prompts and behavior to match your team's practices
-- **GitHub CLI Integration** - Seamless creation of PRs via GitHub CLI when available
+## ✨ Features
+
+- **AI-Generated Commit Messages**: Create semantic, best-practice commit messages.
+- **Commit Optimization**: Improve existing commit messages with AI suggestions.
+- **Smart Branch Names**: Generate descriptive branch names automatically.
+- **Automated PR Creation**: Generate PR titles, descriptions, and create them in seconds.
+- **Multiple LLM Support**: Choose from OpenAI, Anthropic, Ollama, or DeepSeek.
+- **Local AI Integration**: Use local models via Ollama for privacy and speed.
+- **GitHub CLI Integration**: Seamlessly create PRs via GitHub CLI.
+
+---
 
 ## 📋 Requirements
 
 - **Node.js** v18+
 - **pnpm** (recommended) or npm
 - **Git** v2.25+
-- **GitHub CLI** (required) for PR creation
+- **GitHub CLI** (required for PR creation)
+
+---
 
 ## 🛠️ Installation
 
-### Global Installation (for users)
+### 1️⃣ Install GGPR
 
 ```bash
 # Install globally with npm
@@ -49,30 +62,34 @@ npm install -g pr-commit-ai-agent
 # Or with pnpm (recommended)
 pnpm add -g pr-commit-ai-agent
 
-# install gh cli https://cli.github.com/
+# Install GitHub CLI (required for PRs)
 brew install gh
-
 ```
 
-### Get your API keys from any of the following providers:
+---
 
-- [OpenRouter — Free Credits and Models available](https://www.openrouter.ai/)
-- [OpenAI](https://platform.openai.com/signup)
-- [Anthropic](https://www.anthropic.com/)
-- [Google](https://ai.google.dev/gemini-api/docs/api-key)
-- [DeepSeek](https://deepseek.ai/)
-- [Ollama](https://ollama.com/) (local models)
+### 2️⃣ Get Your API Keys 🔑
 
-## ⚙️ Configuration
+GGPR supports multiple AI providers. Some offer **free credits** to get started:
 
-### Option 1: Interactive Configuration (Recommended)
+- 🌟 **[OpenRouter](https://www.openrouter.ai/)** - Free credits and models available!
+- 🤖 **[OpenAI](https://platform.openai.com/signup)** - Industry-leading models.
+- 🧠 **[Anthropic](https://www.anthropic.com/)** - Advanced AI models.
+- 🔍 **[DeepSeek](https://deepseek.ai/)** - Specialized AI solutions.
+- 🖥️ **[Ollama](https://ollama.com/)** - Local models for privacy.
+
+---
+
+### 3️⃣ Configure GGPR ⚙️
+
+#### Option 1: Interactive Setup (Recommended)
 
 ```bash
 # Run the interactive configuration wizard
 ggpr config
 ```
 
-### Option 2: Environment Variables
+#### Option 2: Use Environment Variables
 
 ```bash
 # Set for current session
@@ -83,35 +100,22 @@ export OPENAI_API_KEY=your_key_here
 LLM_PROVIDER=ollama MODEL=qwen2.5-coder OLLAMA_BASE_URL=http://0.0.0.0:11434/api/generate ggpr
 ```
 
-### Option 3: Configuration File
+#### Option 3: Edit Configuration File
 
-- run `ggpr config` to find the config file location, for example (`~/.config/pr-commit-ai-agent-nodejs/config.json`)
-- modify the config file to set your preferred settings
+- Run `ggpr config` to locate the config file (e.g., `~/.config/pr-commit-ai-agent-nodejs/config.json`).
+- Modify the file to set your preferred settings.
 
-### Available Environment Variables
-
-| Environment Variable | Description                                                      | Default                      |
-| -------------------- | ---------------------------------------------------------------- | ---------------------------- |
-| `LLM_PROVIDER`       | AI provider to use (`openai`, `anthropic`, `ollama`, `deepseek`) | `openai`                     |
-| `OPENAI_API_KEY`     | OpenAI API key                                                   | -                            |
-| `ANTHROPIC_API_KEY`  | Anthropic API key                                                | -                            |
-| `DEEPSEEK_API_KEY`   | DeepSeek API key                                                 | -                            |
-| `OLLAMA_BASE_URL`    | URL for Ollama API                                               | `http://localhost:11434/api` |
-| `OLLAMA_API_KEY`     | API key for Ollama (if needed)                                   | -                            |
-| `MODEL`              | Override default model for selected provider                     | Provider-specific            |
+---
 
 ## 📝 Usage
 
 ### Create Command (Default)
 
-Guides you through creating AI-enhanced commits, optimizing messages, and creating a PR.
+Generate AI-enhanced commits, optimize messages, and create PRs.
 
 ```bash
 # Basic usage (interactive)
 ggpr
-
-# Or just:
-ggpr create
 
 # Auto-confirm all prompts
 ggpr --yes
@@ -121,14 +125,11 @@ ggpr --log-request
 
 # Combine flags
 ggpr --yes --log-request
-
-# PR creation
-ggpr --pr
 ```
 
 ### Info Command
 
-Shows repository information and status.
+Display repository information and status.
 
 ```bash
 ggpr info
@@ -142,146 +143,30 @@ ggpr info --full
 Manage your GGPR configuration settings.
 
 ```bash
-# View and modify current config
 ggpr config
 ```
 
-## 📚 Command Reference
-
-### Create Command (default)
-
-The `create` command is the primary command for generating AI-enhanced commits and pull requests. It guides you through the process of creating commit messages, optimizing them, and generating pull requests.
-
-#### Usage
-
-```bash
-ggpr
-# or
-ggpr create
-```
-
-#### Options
-
-| Flag            | Alias | Description                                                       |
-| --------------- | ----- | ----------------------------------------------------------------- |
-| `--yes`         | `-y`  | Auto-confirm all prompts                                          |
-| `--log-request` | `-l`  | Log LLM API requests for debugging                                |
-| `--pr`          |       | Generate commit description and commit and branch and create a PR |
-
 ---
-
-### Config Command
-
-The `config` command allows you to view and modify the configuration settings for GGPR. You can use it interactively or modify the configuration file directly.
-
-#### Usage
-
-```bash
-ggpr config
-```
-
-#### Options
-
-| Flag     | Alias | Description           |
-| -------- | ----- | --------------------- |
-| `--help` | `-h`  | Show help information |
-
----
-
-### Logs Command
-
-The `logs` command provides access to the logs of previous LLM requests and responses. This is useful for debugging or reviewing past interactions.
-
-#### Usage
-
-```bash
-ggpr logs
-```
-
-#### Options
-
-| Flag     | Alias | Description           |
-| -------- | ----- | --------------------- |
-| `--help` | `-h`  | Show help information |
-
----
-
-### Info Command
-
-The `info` command displays information about the current repository, including its status and configuration.
-
-#### Usage
-
-```bash
-ggpr info
-```
-
-#### Options
-
-| Flag     | Alias | Description               |
-| -------- | ----- | ------------------------- |
-| `--full` |       | Show detailed information |
-| `--help` | `-h`  | Show help information     |
-
----
-
-### Common Options
-
-These flags are available for most commands:
-
-| Flag        | Alias | Description              |
-| ----------- | ----- | ------------------------ |
-| `--help`    | `-h`  | Show help information    |
-| `--version` | `-v`  | Show version information |
 
 ## 🚶 Workflow
 
-The `create` command workflow:
+1. **Target Branch Selection**: Choose the branch for your PR.
+2. **Uncommitted Changes**: Generate AI commit messages for your changes.
+3. **Commit Optimization**: Improve existing commit messages.
+4. **Branch Creation**: Create a branch with an AI-generated name.
+5. **PR Creation**: Generate a PR with an AI-generated title and description.
 
-1. **Target Branch Selection** - Choose which branch to target for your PR
-2. **Uncommitted Changes** - Generate an AI commit message for your changes
-3. **Commit Optimization** - AI improves your existing commit messages
-4. **Branch Creation** - Creates a branch with an AI-generated name if needed
-5. **PR Creation** - Creates a PR with AI-generated title and description
-
-## 🛠️ Development
-
-### Quick Start for Contributors
-
-```bash
-# Clone and setup
-git clone https://github.com/meabed/pr-commit-ai-agent.git
-cd pr-commit-ai-agent
-pnpm install
-
-# Development mode
-pnpm start create
-
-# Testing
-pnpm test
-
-# Build
-pnpm build
-```
-
-### Available Scripts
-
-| Command            | Description                                 |
-| ------------------ | ------------------------------------------- |
-| `pnpm build`       | Build the project using tsup                |
-| `pnpm build:watch` | Build with file watching                    |
-| `pnpm start [cmd]` | Run the CLI using ts-node                   |
-| `pnpm commit`      | Use commitizen for standard commit messages |
-| `pnpm format`      | Check code formatting                       |
-| `pnpm format:fix`  | Fix code formatting issues                  |
-| `pnpm lint`        | Check for code style issues                 |
-| `pnpm lint:fix`    | Fix code style issues                       |
-| `pnpm test`        | Run unit tests                              |
-| `pnpm release`     | Create a new release                        |
+---
 
 ## 🤝 Contributing
 
 We welcome contributions of all sizes! Here's how you can help:
+
+1. Fork the repo and create a new branch.
+2. Make your changes and test them locally.
+3. Submit a pull request with a clear description of your changes.
+
+---
 
 ## 📄 License
 
