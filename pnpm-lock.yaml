@@ -21,8 +21,8 @@ importers:
         specifier: 9.25.1
         version: 9.25.1
       ai:
-        specifier: 4.3.11
-        version: 4.3.11(react@19.1.0)(zod@3.24.3)
+        specifier: 4.3.12
+        version: 4.3.12(react@19.1.0)(zod@3.24.3)
       conf:
         specifier: ^13.1.0
         version: 13.1.0
@@ -1163,8 +1163,8 @@ packages:
     resolution: {integrity: sha512-gOsf2YwSlleG6IjRYG2A7k0HmBMEo6qVNk9Bp/EaLgAJT5ngH6PXbqa4ItvnEwCm/velL5jAnQgsHsWnjhGmvw==}
     engines: {node: '>=18'}
 
-  ai@4.3.11:
-    resolution: {integrity: sha512-5korDAKCsDXE5HwglOJ7NxJ32TEj2NmKGQPefcMJMKkjxeJJjC6NfM8qLtPCCk8FoAVtYdIMYPy8dzux423QLg==}
+  ai@4.3.12:
+    resolution: {integrity: sha512-DWjtPI8YJVyvcJx27KW1i6PrwkbjTewflfH+qPtIuoAP0YYs6bH17cAihTt4je+itgazLXK07ZCbV019YkdYjw==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -5274,7 +5274,7 @@ snapshots:
       clean-stack: 5.2.0
       indent-string: 5.0.0
 
-  ai@4.3.11(react@19.1.0)(zod@3.24.3):
+  ai@4.3.12(react@19.1.0)(zod@3.24.3):
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.7(zod@3.24.3)
