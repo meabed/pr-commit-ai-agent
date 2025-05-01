@@ -6,9 +6,7 @@ GGPR is a smart CLI tool leveraging AI to enhance Git workflows by generating hi
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/meabed/pr-commit-ai-agent/actions/workflows/ci.yml)
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/meabed/pr-commit-ai-agent/main/assets/demo.gif" alt="GGPR Demo" width="800"/>
-</div>
+[![demo](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf.svg)](https://asciinema.org/a/9G5YvfqaAJSfhMnVrSeqVqlVf)
 
 ## 🚀 Features
 
