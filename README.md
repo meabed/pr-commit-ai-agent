@@ -64,7 +64,19 @@ pnpm add -g pr-commit-ai-agent
 
 # Install GitHub CLI (required for PRs)
 brew install gh
+
+# Authenticate GitHub CLI with proper scopes
+gh auth login
+
+# Verify GitHub CLI authentication status and scopes
+gh auth status
+
+# Ensure you have the necessary scopes for PR management
+# If required scopes are missing, refresh your token with:
+gh auth refresh --scopes repo,read:org,read:discussion,gist
 ```
+
+> **Note on GitHub Tokens**: If you use `GH_TOKEN` or `GITHUB_TOKEN` environment variables instead of `gh auth login`, ensure your personal access token has the following scopes: `repo`, `read:org`, `read:discussion`, and `gist`. These scopes are required for complete PR management functionality.
 
 ---
 
