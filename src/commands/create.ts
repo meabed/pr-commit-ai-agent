@@ -17,7 +17,7 @@ import { generateCompletion, LLMProvider } from '../services/llm';
 import { ArgumentsCamelCase, Argv } from 'yargs';
 import { PromptOptions } from 'consola';
 import { config } from '../config';
-
+import { execa } from 'execa';
 export const command = 'create';
 export const describe = 'Generate commit messages and create a PR using AI';
 export const aliases = ['c'];
@@ -119,7 +119,6 @@ async function checkForExistingPR(branchName: string): Promise<{ url: string; nu
   }
 
   try {
-    const { execa } = await import('execa');
     // Check if GitHub CLI is available
     const { exitCode: ghExitCode } = await execa('gh', ['--version'], { reject: false });
 
@@ -921,7 +920,6 @@ async function createAndPushPR(
           // Get the current PR description
           let currentDescription = '';
           try {
-            const { execa } = await import('execa');
             const { stdout: prDetails } = await execa(
               'gh',
               ['pr', 'view', existingPR.number.toString(), '--json', 'body', '--jq', '.body'],
@@ -1017,7 +1015,6 @@ Please create a comprehensive description that:
 
             if (confirmDescription) {
               try {
-                const { execa } = await import('execa');
                 await execa('gh', [
                   'pr',
                   'edit',
@@ -1216,7 +1213,6 @@ Branch name: ${prData.suggestedBranchName}
         let isGitHubCliConfigured = false;
 
         try {
-          const { execa } = await import('execa');
           // Check if 'gh' command is available
           const { exitCode: ghExitCode } = await execa('gh', ['--version'], { reject: false });
           isGitHubCliAvailable = ghExitCode === 0;
@@ -1272,7 +1268,6 @@ To: ${upstreamBranch.replace('origin/', '')}
           }
 
           try {
-            const { execa } = await import('execa');
             const upstreamTarget = upstreamBranch.replace('origin/', '');
             logger.info(yellow('Creating PR using GitHub CLI...'));
             try {
