@@ -911,10 +911,139 @@ async function createAndPushPR(
         await git.push('origin', currentBranch);
         logger.success(green(`Successfully pushed updates to PR #${existingPR.number}`));
         logger.info(green(`PR URL: ${existingPR.url}`));
+
+        // Ask if user wants to update the PR description with new changes
+        const updatePrDescription = await confirm('Would you like to update the PR description with the new changes?');
+
+        if (updatePrDescription) {
+          logger.info(yellow('Generating updated PR description...'));
+
+          // Get the current PR description
+          let currentDescription = '';
+          try {
+            const { execa } = await import('execa');
+            const { stdout: prDetails } = await execa(
+              'gh',
+              ['pr', 'view', existingPR.number.toString(), '--json', 'body', '--jq', '.body'],
+              { reject: false }
+            );
+
+            currentDescription = prDetails.trim();
+            logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
+          } catch (error) {
+            logger.warn(yellow(`Failed to get current PR description: ${(error as Error).message}`));
+            logger.info(yellow('Will generate a new description without the previous content'));
+          }
+
+          // Get new commits since the PR was created
+          let newCommits = '';
+          try {
+            const prBranchCommits = await git.log({
+              from: upstreamBranch,
+              to: 'HEAD'
+            });
+
+            if (prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0) {
+              newCommits = prBranchCommits.all
+                .map((commit) => `- ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`)
+                .join('\n');
+            }
+          } catch (error) {
+            logger.warn(yellow(`Failed to get new commits: ${(error as Error).message}`));
+          }
+
+          // Get the diff for new changes
+          let recentChanges = '';
+          try {
+            // Get the latest commit hash
+            const latestCommit = await git.revparse(['HEAD']);
+            // Get the diff of the latest commit
+            recentChanges = await git.show([
+              '-U3',
+              '--minimal',
+              latestCommit,
+              ...ignoredFiles.map((file) => `:(exclude)${file}`),
+              ':(exclude)*.generated.*',
+              ':(exclude)*.lock'
+            ]);
+          } catch (error) {
+            logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
+          }
+
+          // Generate an updated PR description using AI
+          const updateDescriptionPrompt = `
+Generate an updated pull request description that incorporates both the original content and new changes.
+
+Format your response as a JSON object with the following structure:
+{
+  "updatedDescription": "The complete updated PR description with original content preserved when appropriate and new changes clearly highlighted"
+}
+
+Current PR description:
+${currentDescription || 'No current description available'}
+
+New commits added to the PR:
+${newCommits || 'No new commit information available'}
+
+Recent changes:
+${recentChanges || 'No recent changes information available'}
+
+Please create a comprehensive description that:
+1. Preserves relevant information from the original description
+2. Clearly highlights the new changes under a "## Recent Updates" section
+3. Ensures the description is well-formatted with proper markdown
+4. Keeps the total length reasonable (under 4000 characters)
+`;
+
+          const updateRes = await generateCompletion(provider, {
+            model,
+            logRequest: globalLogRequest,
+            prompt: updateDescriptionPrompt
+          });
+
+          let updatedDescriptionData;
+          try {
+            updatedDescriptionData = JSON.parse(updateRes.text);
+
+            if (!updatedDescriptionData?.updatedDescription) {
+              logger.error(red('Updated description missing from AI response'));
+              throw new Error('Invalid AI response format for PR description update');
+            }
+
+            logger.info(green('Generated updated PR description'));
+
+            // Ask the user if they want to apply the updated description
+            const confirmDescription = await confirm('Apply the updated PR description?');
+
+            if (confirmDescription) {
+              try {
+                const { execa } = await import('execa');
+                await execa('gh', [
+                  'pr',
+                  'edit',
+                  existingPR.number.toString(),
+                  '--body',
+                  updatedDescriptionData.updatedDescription
+                ]);
+
+                logger.success(green('Successfully updated PR description'));
+              } catch (error) {
+                logger.error(red(`Failed to update PR description: ${(error as Error).message}`));
+                logger.info(yellow('You can manually update the PR with this description if needed'));
+              }
+            } else {
+              logger.info(yellow('PR description update skipped'));
+            }
+          } catch (e) {
+            logger.error(red(`Failed to parse AI response for updated PR description: ${(e as Error).message}`));
+            logger.debug('Raw response:', updateRes);
+          }
+        }
+
         return;
       } catch (error) {
         logger.error(red(`Failed to push to remote: ${(error as Error).message}`));
-        throw new Error(`Could not update PR for branch ${currentBranch}`);
+        throw new Error(`Could not push branch ${currentBranch} to remote`);
       }
     } else {
       logger.info(yellow('Update cancelled. Will create a new branch and PR instead.'));
@@ -1069,7 +1198,6 @@ Branch name: ${prData.suggestedBranchName}
           await git.push('origin', branchToPush);
           logger.success(green(`Updated existing PR #${existingPR.number}`));
           logger.info(green(`PR URL: ${existingPR.url}`));
-          return;
         } else {
           // Set upstream for new branches
           await git.push('origin', branchToPush, ['--set-upstream']);
