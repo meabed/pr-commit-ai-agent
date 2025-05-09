@@ -104,6 +104,57 @@ async function performGitOperation<T>(operation: () => Promise<T>, errorMessage:
 }
 
 /**
+ * Checks if a branch has an open pull request
+ *
+ * Uses GitHub CLI to check if the current branch already has an open pull request.
+ * This helps determine whether to create a new PR or update an existing one.
+ *
+ * @param branchName - Name of the branch to check for open PRs
+ * @returns Promise resolving to PR information object if a PR exists, null otherwise
+ */
+async function checkForExistingPR(branchName: string): Promise<{ url: string; number: string; title: string } | null> {
+  if (!branchName) {
+    logger.debug('No branch name provided to checkForExistingPR.');
+    return null;
+  }
+
+  try {
+    const { execa } = await import('execa');
+    // Check if GitHub CLI is available
+    const { exitCode: ghExitCode } = await execa('gh', ['--version'], { reject: false });
+
+    if (ghExitCode !== 0) {
+      logger.debug('GitHub CLI not available for PR check');
+      return null;
+    }
+
+    // Use GitHub CLI to list PRs for the current branch
+    const { stdout: prJson, exitCode } = await execa(
+      'gh',
+      ['pr', 'list', '--head', branchName, '--state', 'open', '--json', 'url,number,title', '--limit', '1'],
+      { reject: false }
+    );
+
+    if (exitCode !== 0 || !prJson) {
+      logger.debug(`No PR information available for branch ${branchName}`);
+      return null;
+    }
+
+    const prs = JSON.parse(prJson);
+
+    if (Array.isArray(prs) && prs.length > 0) {
+      logger.debug(`Found existing PR for branch ${branchName}: #${prs[0].number}`);
+      return prs[0];
+    }
+
+    return null;
+  } catch (error) {
+    logger.debug(`Error checking for existing PR: ${(error as Error).message}`);
+    return null;
+  }
+}
+
+/**
  * Main handler for the create command - implements the workflow for creating an AI-assisted PR
  *
  * Guides the user through a series of steps to prepare and create a high-quality PR:
@@ -804,7 +855,7 @@ async function createAndPushPR(
   draft: boolean | undefined,
   confirm: (message: string, options?: PromptOptions) => Promise<unknown>
 ) {
-  logger.info(green('Preparing to create a new branch and PR'));
+  logger.info(green('Preparing to create or update a PR'));
 
   if (!upstreamBranch) {
     logger.error(red('Upstream branch is undefined.'));
@@ -841,6 +892,34 @@ async function createAndPushPR(
   }
 
   const currentBranch = branchSummary.current;
+
+  // Check if the current branch already has an open PR
+  logger.info(yellow('Checking if the current branch already has an open PR...'));
+  const existingPR = await checkForExistingPR(currentBranch);
+
+  if (existingPR) {
+    logger.info(green(`Found existing PR #${existingPR.number} for branch "${currentBranch}"`));
+    logger.info(yellow('Title: ') + existingPR.title);
+    logger.info(yellow('URL: ') + existingPR.url);
+
+    const updateExistingPR = await confirm('Do you want to update this existing PR?');
+
+    if (updateExistingPR) {
+      // Push new commits to the existing branch
+      logger.info(yellow(`Pushing to branch "${currentBranch}" to update PR #${existingPR.number}...`));
+      try {
+        await git.push('origin', currentBranch);
+        logger.success(green(`Successfully pushed updates to PR #${existingPR.number}`));
+        logger.info(green(`PR URL: ${existingPR.url}`));
+        return;
+      } catch (error) {
+        logger.error(red(`Failed to push to remote: ${(error as Error).message}`));
+        throw new Error(`Could not update PR for branch ${currentBranch}`);
+      }
+    } else {
+      logger.info(yellow('Update cancelled. Will create a new branch and PR instead.'));
+    }
+  }
 
   const generatePrDetails = await confirm('Generate PR details with AI based on your commits?');
 
@@ -937,8 +1016,8 @@ Branch name: ${prData.suggestedBranchName}
       let branchToPush = currentBranch;
       const targetBranchName = upstreamBranch.replace('origin/', '');
 
-      // Only create a new branch if the current branch is the target branch
-      if (currentBranch === targetBranchName) {
+      // Only create a new branch if the current branch is the target branch and no existing PR
+      if (currentBranch === targetBranchName && !existingPR) {
         // Create a new branch
         logger.info(
           yellow(`Current branch is the same as target branch. Creating new branch: ${prData.suggestedBranchName}...`)
@@ -963,7 +1042,11 @@ Branch name: ${prData.suggestedBranchName}
           throw new Error(`Could not create branch: ${prData.suggestedBranchName}`);
         }
       } else {
-        logger.info(yellow(`Using current branch "${currentBranch}" for PR`));
+        if (existingPR) {
+          logger.info(yellow(`Using current branch "${currentBranch}" to update existing PR #${existingPR.number}`));
+        } else {
+          logger.info(yellow(`Using current branch "${currentBranch}" for PR`));
+        }
       }
 
       // Push to remote
@@ -972,60 +1055,136 @@ Branch name: ${prData.suggestedBranchName}
         logger.error(red('Branch to push is undefined.'));
         return;
       }
-      const pushConfirm = await confirm('Push branch to remote repository?');
+      const pushConfirm = await confirm(`Push branch "${branchToPush}" to remote repository?`);
 
       if (!pushConfirm) {
         logger.info(yellow('Remote push cancelled'));
         return;
       }
 
-      logger.info(yellow('Pushing to remote repository...'));
+      logger.info(yellow(`Pushing to remote repository...`));
       try {
-        await git.push('origin', branchToPush, ['--set-upstream']);
-        logger.success(green(`Pushed branch to remote`));
+        if (existingPR) {
+          // Simple push for existing PR
+          await git.push('origin', branchToPush);
+          logger.success(green(`Updated existing PR #${existingPR.number}`));
+          logger.info(green(`PR URL: ${existingPR.url}`));
+          return;
+        } else {
+          // Set upstream for new branches
+          await git.push('origin', branchToPush, ['--set-upstream']);
+          logger.success(green(`Pushed branch to remote`));
+        }
       } catch (error) {
         logger.error(red(`Failed to push to remote: ${(error as Error).message}`));
         throw new Error(`Could not push branch ${branchToPush} to remote`);
       }
 
-      // Create PR using GitHub CLI if available, otherwise provide instructions
-      logger.info(yellow('Creating pull request...'));
-      const createGhPrConfirm = await confirm('Create GitHub PR using GitHub CLI?');
+      // Only create a new PR if one doesn't already exist
+      if (!existingPR) {
+        // Check GitHub CLI availability and configuration before offering to create PR
+        logger.info(yellow('Checking GitHub CLI availability...'));
+        let isGitHubCliAvailable = false;
+        let isGitHubCliConfigured = false;
 
-      if (createGhPrConfirm) {
         try {
           const { execa } = await import('execa');
-          const upstreamTarget = upstreamBranch.replace('origin/', '');
+          // Check if 'gh' command is available
+          const { exitCode: ghExitCode } = await execa('gh', ['--version'], { reject: false });
+          isGitHubCliAvailable = ghExitCode === 0;
 
-          logger.info(yellow('Creating PR using GitHub CLI...'));
-          try {
-            // Add draft flag if argv.draft is true
-            const draftFlag = draft === true ? ['--draft'] : [];
-            const { stdout } = await execa('gh', [
-              'pr',
-              'create',
-              '--title',
-              prData.prTitle,
-              '--body',
-              prData.prDescription,
-              '--base',
-              upstreamTarget,
-              ...draftFlag
-            ]);
+          if (isGitHubCliAvailable) {
+            // Check if GitHub CLI is authenticated
+            const { stdout: authStatus, exitCode: authExitCode } = await execa('gh', ['auth', 'status'], {
+              reject: false
+            });
+            isGitHubCliConfigured = authExitCode === 0 && authStatus.includes('Logged in to');
 
-            // Extract PR URL from output or get it using gh pr view
-            let prUrl = stdout.trim();
-            if (!prUrl.includes('http')) {
-              const { stdout: viewOutput } = await execa('gh', ['pr', 'view', '--json', 'url', '--jq', '.url']);
-              prUrl = viewOutput.trim();
+            if (!isGitHubCliConfigured) {
+              logger.warn(yellow('GitHub CLI is installed but not properly configured.'));
+              logger.info(`
+To authenticate GitHub CLI, run the following command:
+$ gh auth login
+
+For more information, visit: https://cli.github.com/manual/gh_auth_login
+              `);
             }
+          } else {
+            logger.warn(yellow('GitHub CLI is not installed on your system.'));
+            logger.info(`
+To install GitHub CLI:
+- macOS: brew install gh
+- Windows: winget install --id GitHub.cli
+- Linux: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
 
-            logger.success(green('Pull request created successfully!'));
-            logger.info(green(`PR URL: ${prUrl}`));
+For more information, visit: https://cli.github.com/manual/installation
+            `);
+          }
+        } catch (error) {
+          logger.warn(yellow(`Failed to check GitHub CLI: ${(error as Error).message}`));
+          isGitHubCliAvailable = false;
+          isGitHubCliConfigured = false;
+        }
+
+        // Create PR using GitHub CLI if available, otherwise provide instructions
+        logger.info(yellow('Creating pull request...'));
+        const createGhPrConfirm = await confirm('Create GitHub PR using GitHub CLI?');
+
+        if (createGhPrConfirm) {
+          if (!isGitHubCliAvailable || !isGitHubCliConfigured) {
+            logger.warn(yellow('GitHub CLI is not available or not properly configured.'));
+            logger.info(yellow('Create PR manually using:'));
+            logger.info(`
+Title: ${prData.prTitle}
+Description: ${prData.prDescription}
+From: ${branchToPush}
+To: ${upstreamBranch.replace('origin/', '')}
+            `);
+            return;
+          }
+
+          try {
+            const { execa } = await import('execa');
+            const upstreamTarget = upstreamBranch.replace('origin/', '');
+            logger.info(yellow('Creating PR using GitHub CLI...'));
+            try {
+              // Add draft flag if argv.draft is true
+              const draftFlag = draft === true ? ['--draft'] : [];
+              const { stdout } = await execa('gh', [
+                'pr',
+                'create',
+                '--title',
+                prData.prTitle,
+                '--body',
+                prData.prDescription,
+                '--base',
+                upstreamTarget,
+                ...draftFlag
+              ]);
+
+              // Extract PR URL from output or get it using gh pr view
+              let prUrl = stdout.trim();
+              if (!prUrl.includes('http')) {
+                const { stdout: viewOutput } = await execa('gh', ['pr', 'view', '--json', 'url', '--jq', '.url']);
+                prUrl = viewOutput.trim();
+              }
+
+              logger.success(green('Pull request created successfully!'));
+              logger.info(green(`PR URL: ${prUrl}`));
+            } catch (error) {
+              // Provide manual instructions if GitHub CLI fails or is not available
+              logger.warn(yellow(`Could not automatically create PR: ${(error as Error).message}`));
+              logger.info(yellow('Please create it manually with:'));
+              logger.info(`
+Title: ${prData.prTitle}
+Description: ${prData.prDescription}
+From: ${branchToPush}
+To: ${upstreamBranch.replace('origin/', '')}
+`);
+            }
           } catch (error) {
-            // Provide manual instructions if GitHub CLI fails or is not available
-            logger.warn(yellow(`Could not automatically create PR: ${(error as Error).message}`));
-            logger.info(yellow('Please create it manually with:'));
+            logger.warn(yellow(`Failed to import execa module: ${(error as Error).message}`));
+            logger.info(yellow('Create PR manually using:'));
             logger.info(`
 Title: ${prData.prTitle}
 Description: ${prData.prDescription}
@@ -1033,9 +1192,8 @@ From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `);
           }
-        } catch (error) {
-          logger.warn(yellow(`Failed to import execa module: ${(error as Error).message}`));
-          logger.info(yellow('Create PR manually using:'));
+        } else {
+          logger.info(yellow('GitHub CLI PR creation skipped. Create PR manually using:'));
           logger.info(`
 Title: ${prData.prTitle}
 Description: ${prData.prDescription}
@@ -1043,14 +1201,6 @@ From: ${branchToPush}
 To: ${upstreamBranch.replace('origin/', '')}
 `);
         }
-      } else {
-        logger.info(yellow('GitHub CLI PR creation skipped. Create PR manually using:'));
-        logger.info(`
-Title: ${prData.prTitle}
-Description: ${prData.prDescription}
-From: ${branchToPush}
-To: ${upstreamBranch.replace('origin/', '')}
-`);
       }
     } else {
       logger.info(yellow('PR creation cancelled'));
