@@ -913,6 +913,7 @@ async function createAndPushPR(
         logger.info(green(`PR URL: ${existingPR.url}`));
 
         // Check if there are new commits to determine if we should prompt for PR description update
+        // Note: This will include the commit(s) we just pushed
         let hasNewCommits = false;
         try {
           const prBranchCommits = await git.log({
@@ -923,14 +924,24 @@ async function createAndPushPR(
           hasNewCommits = prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0;
 
           if (hasNewCommits) {
-            logger.info(green(`Found ${prBranchCommits.all.length} commits from ${upstreamBranch} to HEAD`));
+            // This count includes the commit we just pushed
+            logger.info(green(`Found ${prBranchCommits.all.length} commit(s) in the PR, including your recent push`));
+
+            // Log the commits for clarity
+            if (prBranchCommits.all.length > 0) {
+              logger.info(yellow('Commits in this PR:'));
+              prBranchCommits.all.forEach((commit) => {
+                logger.info(`  ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`);
+              });
+            }
           } else {
-            logger.info(yellow('No new commits found. Skipping PR description update.'));
+            logger.info(yellow('No commits found to include in PR description update.'));
           }
         } catch (error) {
           logger.warn(yellow(`Failed to check for new commits: ${(error as Error).message}`));
-          // Default to not updating if we can't determine
-          hasNewCommits = false;
+          // Default to prompting for update if we can't determine - safer to ask than to skip
+          hasNewCommits = true;
+          logger.info(yellow('Unable to verify commits, will prompt for PR description update.'));
         }
 
         // Only prompt for PR description update if there are new commits
