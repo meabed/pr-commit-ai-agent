@@ -175,7 +175,7 @@ flowchart TD
     Start([Start GGPR]) --> InitConfig[Initialize Configs & Settings]
     InitConfig --> GitStatus[Get Git Status]
     GitStatus --> BranchCheck{Determine\nTarget Branch}
-    
+
     %% Branch Selection Flow
     BranchCheck -->|Find Tracking Branch| TrackingExists{Tracking\nBranch Exists?}
     TrackingExists -->|Yes| ConfirmTracking{Confirm\nTracking Branch?}
@@ -187,7 +187,7 @@ flowchart TD
     ConfirmBranch -->|Yes| TargetBranchSet[Set Target Branch]
     ConfirmBranch -->|No| ExitProcess([Exit Process])
     UseTracking --> TargetBranchSet
-    
+
     %% Uncommitted Changes Flow
     TargetBranchSet --> CheckChanges{Working Dir\nClean?}
     CheckChanges -->|Yes| OptimizeCommits[Optimize Commit Messages]
@@ -204,7 +204,7 @@ flowchart TD
     ConfirmCommit -->|Yes| CreateCommit[Create Commit]
     CreateCommit --> MarkCommit[Mark as Created by Tool]
     MarkCommit --> OptimizeCommits
-    
+
     %% Optimize Commits Flow
     OptimizeCommits --> CommitsExists{Commits to\nOptimize?}
     CommitsExists -->|No| CheckPRFlag
@@ -224,14 +224,14 @@ flowchart TD
     AmendCommit --> MarkAmended[Mark as Created by Tool]
     MarkAmended --> CheckPRFlag
     MarkNoChanges --> CheckPRFlag
-    
+
     %% PR Creation Flow
     CheckPRFlag{Create PR?} -->|No| Complete([Complete])
     CheckPRFlag -->|Yes| ConfirmPR{Proceed with\nCreating PR?}
     ConfirmPR -->|No| Complete
     ConfirmPR -->|Yes| CheckExistingPR[Check for Existing PR]
     CheckExistingPR --> ExistingPR{PR Already\nExists?}
-    
+
     %% Existing PR Flow
     ExistingPR -->|Yes| ConfirmUpdate{Update\nExisting PR?}
     ConfirmUpdate -->|No| GeneratePRDetails
@@ -244,7 +244,7 @@ flowchart TD
     ConfirmUpdateDesc -->|No| Complete
     ConfirmUpdateDesc -->|Yes| UpdatePR[Update PR Title/Description]
     UpdatePR --> Complete
-    
+
     %% New PR Flow
     ExistingPR -->|No| GeneratePRDetails[Generate PR Details with AI]
     GeneratePRDetails --> ConfirmPRDetails{Create PR with\nthese Details?}
@@ -265,12 +265,12 @@ flowchart TD
     CreatePRGH --> PRSuccess[PR Created Successfully]
     ShowManualInstructions --> Complete
     PRSuccess --> Complete
-    
+
     classDef processNode fill:#d4f1f9,stroke:#0e5974,stroke-width:1px;
     classDef decisionNode fill:#ffe6cc,stroke:#d79b00,stroke-width:1px;
     classDef startEndNode fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
     classDef errorNode fill:#f8cecc,stroke:#b85450,stroke-width:1px;
-    
+
     class Start,Complete,ExitProcess startEndNode;
     class BranchCheck,TrackingExists,ConfirmTracking,ConfirmBranch,CheckChanges,HandleChanges,AskAI,ConfirmCommit,CommitsExists,OptimizeConfirm,IsCreatedByTool,IsMergeCommit,AINeedsImprovement,ConfirmAmend,CheckPRFlag,ConfirmPR,ExistingPR,ConfirmUpdate,UpdatePRDesc,ConfirmUpdateDesc,ConfirmPRDetails,CheckBranchTarget,ConfirmNewBranch,CreatePRWithGH,GHCliAvailable decisionNode;
     class ExitProcess errorNode;
