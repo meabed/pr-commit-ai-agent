@@ -1,5 +1,3 @@
-I'll help you refine this prompt to make it clearer for large language models when building agentic code for a CLI app in Node.js and TypeScript. Let me restructure and enhance your instructions for better clarity and comprehensiveness.
-
 # GGPR: AI-Powered Git Workflow CLI Tool
 
 ## Project Overview
@@ -58,7 +56,7 @@ GGPR is an AI-powered CLI tool that supercharges Git workflows by automatically 
 - Include meaningful logging at appropriate levels
 - Write clean, maintainable code with consistent formatting
 - Use ESLint and Prettier configurations consistent with the project
-- Use early returns to avoid deep nesting and improve readability
+- Implement early returns to avoid deep nesting and improve readability
 
 ### Dependencies
 
