@@ -14,7 +14,8 @@ The GGPR is an AI-powered CLI tool that **supercharges your Git workflow** by ge
 - always look in the surrounding files and structure to understand the current code structure and practices and to follow the same
 - use early returns to avoid deep nesting and improve readability
 
-- some library and code used 
+- some library and code used
+
 ```
 import { simpleGit, SimpleGit, StatusResult } from 'simple-git';
 import { generateCompletion, LLMProvider } from '../services/llm';
