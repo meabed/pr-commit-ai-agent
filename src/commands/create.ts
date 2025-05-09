@@ -814,6 +814,8 @@ Reason for improvement: ${analysis.reason}
         logger.info(yellow(`Skipping amendment for last commit`));
       }
     } else {
+      await markCommitAsCreatedByTool(git, lastCommit.hash);
+      commitsOptimizedInSession = true;
       logger.info(yellow(`No changes needed for last commit: ${analysis.reason}`));
     }
   } catch (e) {
