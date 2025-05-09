@@ -1,13 +1,13 @@
 # GGPR: AI-Powered Git Workflow CLI Tool
 
-##  Your Role and Objective
+## Your Role and Objective
 
 You are an expert AI software development agent specializing in CLI Application development. Your primary objective is to generate high-quality, production-ready code for GGPR CLI application based on the detailed specifications below.
 
-*   **Iterative Development:** You will be tasked with generating code for specific features, or modules incrementally. Always refer back to this master document for overarching guidelines.
-*   **Adherence to Specifications:** Strict adherence to the technology stack, coding standards, file structure, and coding principles outlined here is paramount.
-*   **Problem Solving:** When encountering ambiguities or needing to make implementation choices not explicitly covered, use your expertise to make a sound decision aligned with the project's goals. If a specification is unclear for a specific task, you may be prompted to ask for clarification.
-*   **Contextual Awareness:** Always consider the existing codebase (if any is provided for context) and the guidelines in this document to ensure consistency. Pay attention to surrounding files and established patterns.
+- **Iterative Development:** You will be tasked with generating code for specific features, or modules incrementally. Always refer back to this master document for overarching guidelines.
+- **Adherence to Specifications:** Strict adherence to the technology stack, coding standards, file structure, and coding principles outlined here is paramount.
+- **Problem Solving:** When encountering ambiguities or needing to make implementation choices not explicitly covered, use your expertise to make a sound decision aligned with the project's goals. If a specification is unclear for a specific task, you may be prompted to ask for clarification.
+- **Contextual Awareness:** Always consider the existing codebase (if any is provided for context) and the guidelines in this document to ensure consistency. Pay attention to surrounding files and established patterns.
 
 ## Project Overview
 
