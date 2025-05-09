@@ -912,65 +912,90 @@ async function createAndPushPR(
         logger.success(green(`Successfully pushed updates to PR #${existingPR.number}`));
         logger.info(green(`PR URL: ${existingPR.url}`));
 
-        // Ask if user wants to update the PR description with new changes
-        const updatePrDescription = await confirm('Would you like to update the PR description with the new changes?');
+        // Check if there are new commits to determine if we should prompt for PR description update
+        let hasNewCommits = false;
+        try {
+          const prBranchCommits = await git.log({
+            from: upstreamBranch,
+            to: 'HEAD'
+          });
 
-        if (updatePrDescription) {
-          logger.info(yellow('Generating updated PR description...'));
+          hasNewCommits = prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0;
 
-          // Get the current PR description
-          let currentDescription = '';
-          try {
-            const { stdout: prDetails } = await execa(
-              'gh',
-              ['pr', 'view', existingPR.number.toString(), '--json', 'body', '--jq', '.body'],
-              { reject: false }
-            );
-
-            currentDescription = prDetails.trim();
-            logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
-          } catch (error) {
-            logger.warn(yellow(`Failed to get current PR description: ${(error as Error).message}`));
-            logger.info(yellow('Will generate a new description without the previous content'));
+          if (hasNewCommits) {
+            logger.info(green(`Found ${prBranchCommits.all.length} commits from ${upstreamBranch} to HEAD`));
+          } else {
+            logger.info(yellow('No new commits found. Skipping PR description update.'));
           }
+        } catch (error) {
+          logger.warn(yellow(`Failed to check for new commits: ${(error as Error).message}`));
+          // Default to not updating if we can't determine
+          hasNewCommits = false;
+        }
 
-          // Get new commits since the PR was created
-          let newCommits = '';
-          try {
-            const prBranchCommits = await git.log({
-              from: upstreamBranch,
-              to: 'HEAD'
-            });
+        // Only prompt for PR description update if there are new commits
+        if (hasNewCommits) {
+          // Ask if user wants to update the PR description with new changes
+          const updatePrDescription = await confirm(
+            'Would you like to update the PR description with the new changes?'
+          );
 
-            if (prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0) {
-              newCommits = prBranchCommits.all
-                .map((commit) => `- ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`)
-                .join('\n');
+          if (updatePrDescription) {
+            logger.info(yellow('Generating updated PR description...'));
+
+            // Get the current PR description
+            let currentDescription = '';
+            try {
+              const { stdout: prDetails } = await execa(
+                'gh',
+                ['pr', 'view', existingPR.number.toString(), '--json', 'body', '--jq', '.body'],
+                { reject: false }
+              );
+
+              currentDescription = prDetails.trim();
+              logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
+            } catch (error) {
+              logger.warn(yellow(`Failed to get current PR description: ${(error as Error).message}`));
+              logger.info(yellow('Will generate a new description without the previous content'));
             }
-          } catch (error) {
-            logger.warn(yellow(`Failed to get new commits: ${(error as Error).message}`));
-          }
 
-          // Get the diff for new changes
-          let recentChanges = '';
-          try {
-            // Get the latest commit hash
-            const latestCommit = await git.revparse(['HEAD']);
-            // Get the diff of the latest commit
-            recentChanges = await git.show([
-              '-U3',
-              '--minimal',
-              latestCommit,
-              ...ignoredFiles.map((file) => `:(exclude)${file}`),
-              ':(exclude)*.generated.*',
-              ':(exclude)*.lock'
-            ]);
-          } catch (error) {
-            logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
-          }
+            // Get new commits since the PR was created
+            let newCommits = '';
+            try {
+              const prBranchCommits = await git.log({
+                from: upstreamBranch,
+                to: 'HEAD'
+              });
 
-          // Generate an updated PR description using AI
-          const updateDescriptionPrompt = `
+              if (prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0) {
+                newCommits = prBranchCommits.all
+                  .map((commit) => `- ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`)
+                  .join('\n');
+              }
+            } catch (error) {
+              logger.warn(yellow(`Failed to get new commits: ${(error as Error).message}`));
+            }
+
+            // Get the diff for new changes
+            let recentChanges = '';
+            try {
+              // Get the latest commit hash
+              const latestCommit = await git.revparse(['HEAD']);
+              // Get the diff of the latest commit
+              recentChanges = await git.show([
+                '-U3',
+                '--minimal',
+                latestCommit,
+                ...ignoredFiles.map((file) => `:(exclude)${file}`),
+                ':(exclude)*.generated.*',
+                ':(exclude)*.lock'
+              ]);
+            } catch (error) {
+              logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
+            }
+
+            // Generate an updated PR description using AI
+            const updateDescriptionPrompt = `
 Generate an updated pull request description that incorporates both the original content and new changes.
 
 Format your response as a JSON object with the following structure:
@@ -994,47 +1019,48 @@ Please create a comprehensive description that:
 4. Keeps the total length reasonable (under 4000 characters)
 `;
 
-          const updateRes = await generateCompletion(provider, {
-            model,
-            logRequest: globalLogRequest,
-            prompt: updateDescriptionPrompt
-          });
+            const updateRes = await generateCompletion(provider, {
+              model,
+              logRequest: globalLogRequest,
+              prompt: updateDescriptionPrompt
+            });
 
-          let updatedDescriptionData;
-          try {
-            updatedDescriptionData = JSON.parse(updateRes.text);
+            let updatedDescriptionData;
+            try {
+              updatedDescriptionData = JSON.parse(updateRes.text);
 
-            if (!updatedDescriptionData?.updatedDescription) {
-              logger.error(red('Updated description missing from AI response'));
-              throw new Error('Invalid AI response format for PR description update');
-            }
-
-            logger.info(green('Generated updated PR description'));
-
-            // Ask the user if they want to apply the updated description
-            const confirmDescription = await confirm('Apply the updated PR description?');
-
-            if (confirmDescription) {
-              try {
-                await execa('gh', [
-                  'pr',
-                  'edit',
-                  existingPR.number.toString(),
-                  '--body',
-                  updatedDescriptionData.updatedDescription
-                ]);
-
-                logger.success(green('Successfully updated PR description'));
-              } catch (error) {
-                logger.error(red(`Failed to update PR description: ${(error as Error).message}`));
-                logger.info(yellow('You can manually update the PR with this description if needed'));
+              if (!updatedDescriptionData?.updatedDescription) {
+                logger.error(red('Updated description missing from AI response'));
+                throw new Error('Invalid AI response format for PR description update');
               }
-            } else {
-              logger.info(yellow('PR description update skipped'));
+
+              logger.info(green('Generated updated PR description'));
+
+              // Ask the user if they want to apply the updated description
+              const confirmDescription = await confirm('Apply the updated PR description?');
+
+              if (confirmDescription) {
+                try {
+                  await execa('gh', [
+                    'pr',
+                    'edit',
+                    existingPR.number.toString(),
+                    '--body',
+                    updatedDescriptionData.updatedDescription
+                  ]);
+
+                  logger.success(green('Successfully updated PR description'));
+                } catch (error) {
+                  logger.error(red(`Failed to update PR description: ${(error as Error).message}`));
+                  logger.info(yellow('You can manually update the PR with this description if needed'));
+                }
+              } else {
+                logger.info(yellow('PR description update skipped'));
+              }
+            } catch (e) {
+              logger.error(red(`Failed to parse AI response for updated PR description: ${(e as Error).message}`));
+              logger.debug('Raw response:', updateRes);
             }
-          } catch (e) {
-            logger.error(red(`Failed to parse AI response for updated PR description: ${(e as Error).message}`));
-            logger.debug('Raw response:', updateRes);
           }
         }
 
