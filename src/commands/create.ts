@@ -128,7 +128,7 @@ async function performGitOperation<T>(operation: () => Promise<T>, errorMessage:
  */
 async function checkForExistingPR(branchName: string): Promise<{ url: string; number: string; title: string } | null> {
   if (!branchName) {
-    logger.debug('No branch name provided to checkForExistingPR.');
+    logger.debug('[PR-CHECK] No branch name provided to checkForExistingPR.');
     return null;
   }
 
@@ -137,7 +137,7 @@ async function checkForExistingPR(branchName: string): Promise<{ url: string; nu
     const { exitCode: ghExitCode } = await execa('gh', ['--version'], { reject: false });
 
     if (ghExitCode !== 0) {
-      logger.debug('GitHub CLI not available for PR check');
+      logger.debug('[PR-CHECK] GitHub CLI not available for PR check');
       return null;
     }
 
@@ -149,20 +149,20 @@ async function checkForExistingPR(branchName: string): Promise<{ url: string; nu
     );
 
     if (exitCode !== 0 || !prJson) {
-      logger.debug(`No PR information available for branch ${branchName}`);
+      logger.debug(`[PR-CHECK] No PR information available for branch ${branchName}`);
       return null;
     }
 
     const prs = JSON.parse(prJson);
 
     if (Array.isArray(prs) && prs.length > 0) {
-      logger.debug(`Found existing PR for branch ${branchName}: #${prs[0].number}`);
+      logger.debug(`[PR-CHECK] Found existing PR for branch ${branchName}: #${prs[0].number}`);
       return prs[0];
     }
 
     return null;
   } catch (error) {
-    logger.debug(`Error checking for existing PR: ${(error as Error).message}`);
+    logger.debug(`[PR-CHECK] Error checking for existing PR: ${(error as Error).message}`);
     return null;
   }
 }
@@ -186,11 +186,11 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
   // @ts-expect-error
   const baseUrl = config?.[provider]?.baseURL;
   // Log the current model, provider, and API URL
-  logger.info(green('Configuration:'));
-  logger.info(`  Provider: ${provider}`);
-  logger.info(`  Model: ${model}`);
+  logger.info(green('[CONFIG] Current settings:'));
+  logger.info(`[CONFIG] Provider: ${provider}`);
+  logger.info(`[CONFIG] Model: ${model}`);
   if (baseUrl) {
-    logger.info(`  API URL: ${baseUrl}`);
+    logger.info(`[CONFIG] API URL: ${baseUrl}`);
   }
 
   const ready = await globalConfirm(`Are you ready to create an AI PR?`);
@@ -200,7 +200,7 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
   try {
     const currentDir = process.cwd();
     if (!currentDir) {
-      logger.error(red('Failed to get current working directory.'));
+      logger.error(red('[INIT] Failed to get current working directory.'));
       return;
     }
 
@@ -210,61 +210,61 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
       maxConcurrentProcesses: 6
     });
 
-    const status = await performGitOperation(() => git.status(), 'Failed to get git status');
+    const status = await performGitOperation(() => git.status(), '[GIT] Failed to get git status');
     if (!status) return;
 
-    logger.info(yellow('Next step: Determine the target branch for your PR'));
+    logger.info(yellow('[WORKFLOW] Next step: Determine the target branch for your PR'));
     const proceedWithBranch = await globalConfirm('Would you like to proceed with determining the target branch?');
     if (!proceedWithBranch) {
-      logger.info(yellow('Process cancelled by user'));
+      logger.info(yellow('[WORKFLOW] Process cancelled by user'));
       return;
     }
 
     const upstreamBranch = await performGitOperation(
       () => getUpstreamBranch(git, globalConfirm),
-      'Failed to determine upstream branch'
+      '[GIT] Failed to determine upstream branch'
     );
     if (!upstreamBranch) return;
 
     if (!status.isClean()) {
-      logger.info(yellow('Next step: Handle uncommitted changes in your working directory'));
+      logger.info(yellow('[WORKFLOW] Next step: Handle uncommitted changes in your working directory'));
       const proceedWithChanges = await globalConfirm('Would you like to commit your uncommitted changes?');
       if (!proceedWithChanges) {
-        logger.info(yellow('Process cancelled by user'));
+        logger.info(yellow('[WORKFLOW] Process cancelled by user'));
         return;
       }
 
       await performGitOperation(
         () => handleUncommittedChanges(git, status, globalConfirm),
-        'Failed to handle uncommitted changes'
+        '[GIT] Failed to handle uncommitted changes'
       );
     } else {
-      logger.info(green('Working directory is clean'));
+      logger.info(green('[GIT] Working directory is clean'));
     }
 
     await performGitOperation(
       () => optimizeCommitMessages(git, upstreamBranch, globalConfirm),
-      'Failed to optimize commit messages'
+      '[GIT] Failed to optimize commit messages'
     );
 
     if (!argv?.pr) {
-      logger.info(yellow('Skipping PR creation as --pr flag is not set'));
+      logger.info(yellow('[WORKFLOW] Skipping PR creation as --pr flag is not set'));
       return;
     }
 
-    logger.info(yellow('Final step: Create a new branch and push PR to remote'));
+    logger.info(yellow('[WORKFLOW] Final step: Create a new branch and push PR to remote'));
     const proceedWithPR = await globalConfirm('Would you like to proceed with creating a PR?');
     if (!proceedWithPR) {
-      logger.info(yellow('PR creation cancelled by user'));
+      logger.info(yellow('[WORKFLOW] PR creation cancelled by user'));
       return;
     }
 
     await performGitOperation(
       () => createAndPushPR(git, upstreamBranch, argv?.draft, globalConfirm),
-      'Failed to create and push PR'
+      '[GIT] Failed to create and push PR'
     );
   } catch (e) {
-    logger.error(red(`Unexpected error occurred: ${(e as Error).message}`));
+    logger.error(red(`[ERROR] Unexpected error occurred: ${(e as Error).message}`));
   }
 }
 
@@ -293,48 +293,48 @@ async function getUpstreamBranch(
   confirm: (message: string, options?: PromptOptions) => Promise<unknown>
 ): Promise<string> {
   try {
-    logger.info(green('Attempting to determine the upstream branch...'));
+    logger.info(green('[BRANCH] Attempting to determine the upstream branch...'));
 
     // Try to get the tracking branch directly
     let branchInfo;
     try {
       branchInfo = await git.branch();
       if (!branchInfo || !branchInfo.current) {
-        logger.error(red('Branch information is undefined or missing current branch.'));
+        logger.error(red('[BRANCH] Branch information is undefined or missing current branch.'));
         throw new Error('Could not determine current branch');
       }
     } catch (error) {
-      logger.error(red(`Failed to get branch information: ${(error as Error).message}`));
+      logger.error(red(`[BRANCH] Failed to get branch information: ${(error as Error).message}`));
       throw new Error('Could not determine current branch');
     }
 
     const trackingBranch = await git.revparse(['--abbrev-ref', '--symbolic-full-name', '@{u}']).catch(() => {
-      logger.info(yellow('No tracking branch found'));
+      logger.info(yellow('[BRANCH] No tracking branch found'));
       return null;
     });
 
     if (branchInfo.current && trackingBranch) {
-      logger.info(green(`Found tracking branch: ${trackingBranch}`));
+      logger.info(green(`[BRANCH] Found tracking branch: ${trackingBranch}`));
       const confirmTracking = await confirm(`Use "${trackingBranch}" as the target branch?`);
 
       if (confirmTracking) {
         return trackingBranch;
       } else {
-        logger.info(yellow('You chose to select a different target branch'));
+        logger.info(yellow('[BRANCH] You chose to select a different target branch'));
       }
     }
 
     // If no tracking branch or user declined, get remote branches and ask user
-    logger.info(yellow('Fetching available remote branches...'));
+    logger.info(yellow('[BRANCH] Fetching available remote branches...'));
     let remoteBranches;
     try {
       remoteBranches = await git.branch(['--remotes']);
       if (!remoteBranches || !remoteBranches.all) {
-        logger.error(red('Remote branches information is undefined.'));
+        logger.error(red('[BRANCH] Remote branches information is undefined.'));
         throw new Error('Could not retrieve remote branches');
       }
     } catch (error) {
-      logger.error(red(`Failed to fetch remote branches: ${(error as Error).message}`));
+      logger.error(red(`[BRANCH] Failed to fetch remote branches: ${(error as Error).message}`));
       throw new Error('Could not retrieve remote branches');
     }
 
@@ -347,7 +347,7 @@ async function getUpstreamBranch(
     }
 
     // Ask a user which branch to target - can't auto-confirm select
-    const targetBranch = await logger.prompt(yellow('Select target branch for PR:'), {
+    const targetBranch = await logger.prompt(yellow('[BRANCH] Select target branch for PR:'), {
       type: 'select',
       options: branches
     });
@@ -356,17 +356,17 @@ async function getUpstreamBranch(
       throw new Error('No branch selected');
     }
 
-    logger.info(green(`Selected target branch: ${targetBranch}`));
+    logger.info(green(`[BRANCH] Selected target branch: ${targetBranch}`));
     const confirmSelected = await confirm(`Confirm "${targetBranch}" as your target branch?`);
 
     if (!confirmSelected) {
-      logger.info(yellow('Branch selection cancelled. Please start over.'));
+      logger.info(yellow('[BRANCH] Branch selection cancelled. Please start over.'));
       process.exit(0);
     }
 
     return targetBranch;
   } catch (error) {
-    logger.error(red(`Failed to determine upstream branch: ${(error as Error).message}`));
+    logger.error(red(`[BRANCH] Failed to determine upstream branch: ${(error as Error).message}`));
     throw error;
   }
 }
@@ -393,23 +393,23 @@ async function handleUncommittedChanges(
   status: StatusResult,
   confirm: (message: string, options?: PromptOptions) => Promise<unknown>
 ) {
-  logger.info(yellow('Found uncommitted changes in the working directory'));
+  logger.info(yellow('[COMMIT] Found uncommitted changes in the working directory'));
 
   const proceedWithAnalysis = await confirm('Analyze changes with AI to generate a commit message?');
 
   if (!proceedWithAnalysis) {
-    logger.info(yellow('Commit creation cancelled'));
+    logger.info(yellow('[COMMIT] Commit creation cancelled'));
     process.exit(0);
   }
 
-  logger.info(yellow('Collecting modified file details for analysis...'));
+  logger.info(yellow('[COMMIT] Collecting modified file details for analysis...'));
 
   // Filter out lock files and other noise from analysis
   const modifiedFiles =
     status && Array.isArray(status.modified) ? status.modified.filter((e) => e && !ignoredFiles.includes(e)) : [];
 
   if (!modifiedFiles || modifiedFiles.length === 0) {
-    logger.info(yellow('No modified files to analyze.'));
+    logger.info(yellow('[COMMIT] No modified files to analyze.'));
     return;
   }
 
@@ -417,7 +417,7 @@ async function handleUncommittedChanges(
   const tempModified = [] as string[];
   for (const file of modifiedFiles) {
     if (!file) continue;
-    logger.info(yellow(`Analyzing changes in: ${file}`));
+    logger.info(yellow(`[COMMIT] Analyzing changes in: ${file}`));
     try {
       const stagedDiff = await git.diff(['-U3', '--minimal', '--staged', file]);
       const unstagedDiff = await git.diff(['-U3', '--minimal', file]);
@@ -428,21 +428,21 @@ diff changes: ${diff}
 
 `);
     } catch (error) {
-      logger.warn(yellow(`Failed to get diff for ${file}: ${(error as Error).message}`));
+      logger.warn(yellow(`[COMMIT] Failed to get diff for ${file}: ${(error as Error).message}`));
       // Continue with other files
     }
   }
 
-  logger.info(yellow('Generating commit message with AI...'));
+  logger.info(yellow('[COMMIT] Generating commit message with AI...'));
   const confirmAiRequest = await confirm('Send changes to AI for commit message suggestion?');
 
   if (!confirmAiRequest) {
-    logger.info(yellow('AI message generation cancelled'));
+    logger.info(yellow('[COMMIT] AI message generation cancelled'));
     process.exit(0);
   }
 
   if (!tempModified || tempModified.length === 0) {
-    logger.error(red('No diffs available for AI analysis.'));
+    logger.error(red('[COMMIT] No diffs available for AI analysis.'));
     return;
   }
 
@@ -459,7 +459,7 @@ ${tempModified.join('')}
 
 `;
 
-  logger.info(green('Sending changes to LLM for commit suggestion...'));
+  logger.info(green('[COMMIT] Sending changes to LLM for commit suggestion...'));
   const res = await generateCompletion(provider, {
     model,
     logRequest: globalLogRequest,
@@ -470,11 +470,11 @@ ${tempModified.join('')}
   try {
     commitData = JSON.parse(res.text);
     if (!commitData.commitMessage) {
-      logger.error(red('No commit message found in LLM response'));
-      logger.debug('Raw response:', res);
+      logger.error(red('[COMMIT] No commit message found in LLM response'));
+      logger.debug('[COMMIT] Raw response:', res);
       throw new Error('Invalid LLM response format');
     }
-    logger.info(green('Got commit suggestion:'));
+    logger.info(green('[COMMIT] Got commit suggestion:'));
     logger.info(`
 ---------------------------
 Commit Message:
@@ -486,15 +486,15 @@ ${commitData.commitMessage}
     const commitConfirm = await confirm('Proceed with this commit?');
 
     if (commitConfirm) {
-      logger.info(yellow('Adding all changes to git...'));
+      logger.info(yellow('[COMMIT] Adding all changes to git...'));
       try {
         await git.add('.');
       } catch (error) {
-        logger.error(red(`Failed to add changes to git staging area: ${(error as Error).message}`));
+        logger.error(red(`[COMMIT] Failed to add changes to git staging area: ${(error as Error).message}`));
         throw new Error('Failed to stage changes');
       }
 
-      logger.info(yellow('Creating commit with the suggested message...'));
+      logger.info(yellow('[COMMIT] Creating commit with the suggested message...'));
       try {
         const commitResult = await git.commit(commitData.commitMessage);
         // Mark this commit as created by pr-agent using git notes
@@ -504,18 +504,18 @@ ${commitData.commitMessage}
           commitsCreatedInSession = true;
         }
       } catch (error) {
-        logger.error(red(`Failed to create commit: ${(error as Error).message}`));
+        logger.error(red(`[COMMIT] Failed to create commit: ${(error as Error).message}`));
         throw new Error('Commit creation failed');
       }
 
-      logger.success(green('Changes committed successfully!'));
+      logger.success(green('[COMMIT] Changes committed successfully!'));
     } else {
-      logger.info(yellow('Commit cancelled'));
+      logger.info(yellow('[COMMIT] Commit cancelled'));
       process.exit(0);
     }
   } catch (e) {
-    logger.debug('Raw response:', res);
-    logger.error(red(`Failed to parse LLM response as JSON: ${(e as Error).message}`));
+    logger.debug('[COMMIT] Raw response:', res);
+    logger.error(red(`[COMMIT] Failed to parse LLM response as JSON: ${(e as Error).message}`));
     process.exit(0);
   }
 
@@ -599,15 +599,15 @@ async function optimizeCommitMessages(
   upstreamBranch: string,
   confirm: (message: string, options?: PromptOptions) => Promise<unknown>
 ) {
-  logger.info(yellow('Starting commit message optimization process...'));
+  logger.info(yellow('[OPTIMIZE] Starting commit message optimization process...'));
 
   if (!upstreamBranch) {
-    logger.error(red('Upstream branch is undefined.'));
+    logger.error(red('[OPTIMIZE] Upstream branch is undefined.'));
     return;
   }
 
   // Get all commits between current HEAD and upstream branch
-  logger.info(yellow('Fetching commits information...'));
+  logger.info(yellow('[OPTIMIZE] Fetching commits information...'));
   let commits;
   try {
     commits = await git.log({
@@ -615,75 +615,77 @@ async function optimizeCommitMessages(
       to: 'HEAD'
     });
   } catch (error) {
-    logger.error(red(`Failed to get commit logs: ${(error as Error).message}`));
+    logger.error(red(`[OPTIMIZE] Failed to get commit logs: ${(error as Error).message}`));
     throw new Error('Could not retrieve commit history');
   }
 
   if (!commits || !Array.isArray(commits.all) || !commits.all.length) {
-    logger.info(yellow('No commits to optimize'));
+    logger.info(yellow('[OPTIMIZE] No commits to optimize'));
     return;
   }
 
-  logger.info(green(`Found ${commits.all.length} commit(s) in the branch`));
-  logger.info(yellow('Next step: Optimize existing commit messages'));
+  logger.info(green(`[OPTIMIZE] Found ${commits.all.length} commit(s) in the branch`));
+  logger.info(yellow('[OPTIMIZE] Next step: Optimize existing commit messages'));
 
   const proceedWithOptimize = await globalConfirm('Would you like to optimize your commit messages?');
   if (!proceedWithOptimize) {
-    logger.info(yellow('Skipping commit message optimization'));
+    logger.info(yellow('[OPTIMIZE] Skipping commit message optimization'));
     return;
   }
 
   // Only focus on the last commit for optimization
   const lastCommit = commits?.all?.[0];
   if (!lastCommit || !lastCommit.hash) {
-    logger.info(yellow('No commits found to optimize'));
+    logger.info(yellow('[OPTIMIZE] No commits found to optimize'));
     return;
   }
 
   // Check if this tool created the last commit
   const isToolCommit = await isCommitCreatedByTool(git, lastCommit.hash);
   if (isToolCommit) {
-    logger.info(yellow(`Last commit was already created by PR Agent, skipping optimization`));
+    logger.info(yellow(`[OPTIMIZE] Last commit was already created by PR Agent, skipping optimization`));
     return;
   }
 
-  logger.info(yellow(`Will optimize the last commit: ${lastCommit.hash.substring(0, 7)} - ${lastCommit.message}`));
+  logger.info(
+    yellow(`[OPTIMIZE] Will optimize the last commit: ${lastCommit.hash.substring(0, 7)} - ${lastCommit.message}`)
+  );
 
   // Check if this is a merge commit (has multiple parents)
   let revList;
   try {
     revList = await git.raw(['rev-list', '--parents', '-n', '1', lastCommit.hash]);
     if (!revList) {
-      logger.error(red('Failed to get parent hashes for last commit.'));
+      logger.error(red('[OPTIMIZE] Failed to get parent hashes for last commit.'));
       return;
     }
   } catch (error) {
-    logger.error(red(`Failed to check commit parents: ${(error as Error).message}`));
+    logger.error(red(`[OPTIMIZE] Failed to check commit parents: ${(error as Error).message}`));
     throw new Error('Could not determine if commit is a merge commit');
   }
 
   const parentHashes = revList.trim().split(' ');
 
   if (!parentHashes || parentHashes.length === 0) {
-    logger.error(red('Parent hashes are undefined or empty.'));
+    logger.error(red('[OPTIMIZE] Parent hashes are undefined or empty.'));
     return;
   }
 
   // If there are more than 2 entries (commit hash and parent hashes), it's a merge commit
   if (parentHashes.length > 2) {
-    logger.info(yellow(`Cannot optimize merge commit: ${lastCommit.hash.substring(0, 7)}`));
+    logger.info(yellow(`[OPTIMIZE] Cannot optimize merge commit: ${lastCommit.hash.substring(0, 7)}`));
     return;
   }
 
   const continueOptimization = await confirm('Continue with commit message optimization?');
 
   if (!continueOptimization) {
-    logger.info(yellow('Commit message optimization cancelled'));
+    logger.info(yellow('[OPTIMIZE] Commit message optimization cancelled'));
     return;
   }
 
   // Get the comprehensive diff from upstream branch to HEAD
-  logger.info(yellow(`Getting full diff context from ${upstreamBranch} to HEAD for better analysis...`));
+  logger.info(yellow(`[OPTIMIZE] Getting full diff context from ${upstreamBranch} to HEAD for better analysis...`));
   let fullDiff;
   try {
     fullDiff = await git.diff([
@@ -702,16 +704,16 @@ async function optimizeCommitMessages(
       ':(exclude)*.jpeg'
     ]);
     if (typeof fullDiff !== 'string') {
-      logger.error(red('Full diff is not a string.'));
+      logger.error(red('[OPTIMIZE] Full diff is not a string.'));
       return;
     }
   } catch (error) {
-    logger.error(red(`Failed to get full branch diff: ${(error as Error).message}`));
+    logger.error(red(`[OPTIMIZE] Failed to get full branch diff: ${(error as Error).message}`));
     throw new Error('Could not retrieve branch diff for analysis');
   }
 
   // Get the individual commit diff as well
-  logger.info(yellow(`Also analyzing the specific commit: ${lastCommit.hash.substring(0, 7)}`));
+  logger.info(yellow(`[OPTIMIZE] Also analyzing the specific commit: ${lastCommit.hash.substring(0, 7)}`));
   let commitDiff;
   try {
     commitDiff = await git.show([
@@ -729,12 +731,12 @@ async function optimizeCommitMessages(
       ':(exclude)*.jpeg'
     ]);
     if (typeof commitDiff !== 'string') {
-      logger.warn(yellow('Commit diff is not a string.'));
+      logger.warn(yellow('[OPTIMIZE] Commit diff is not a string.'));
       commitDiff = 'Failed to retrieve specific commit diff';
     }
   } catch (error) {
-    logger.error(red(`Failed to get commit diff: ${(error as Error).message}`));
-    logger.info(yellow('Will continue with just the full branch diff for analysis'));
+    logger.error(red(`[OPTIMIZE] Failed to get commit diff: ${(error as Error).message}`));
+    logger.info(yellow('[OPTIMIZE] Will continue with just the full branch diff for analysis'));
     commitDiff = 'Failed to retrieve specific commit diff';
   }
 
@@ -764,7 +766,7 @@ Full branch context (all changes from upstream to HEAD):
 ${fullDiff}
 `;
 
-  logger.info(yellow(`Requesting commit message analysis from AI with comprehensive context...`));
+  logger.info(yellow(`[OPTIMIZE] Requesting commit message analysis from AI with comprehensive context...`));
   const res = await generateCompletion(provider, {
     model,
     logRequest: globalLogRequest,
@@ -775,12 +777,12 @@ ${fullDiff}
     const analysis = JSON.parse(res.text);
 
     if (!analysis || typeof analysis !== 'object') {
-      logger.error(red('AI analysis response is not an object.'));
+      logger.error(red('[OPTIMIZE] AI analysis response is not an object.'));
       throw new Error('Invalid AI analysis response');
     }
 
     if (analysis.needsImprovement) {
-      logger.info(green(`AI suggests improving the last commit message`));
+      logger.info(green(`[OPTIMIZE] AI suggests improving the last commit message`));
       logger.info(`
 ---------------------------
 Commit message analysis:
@@ -793,7 +795,7 @@ Reason for improvement: ${analysis.reason}
       const amendConfirm = await confirm(`Amend commit ${lastCommit.hash.substring(0, 7)} with the improved message?`);
 
       if (amendConfirm) {
-        logger.info(green(`Amending last commit ${lastCommit.hash.substring(0, 7)}...`));
+        logger.info(green(`[OPTIMIZE] Amending last commit ${lastCommit.hash.substring(0, 7)}...`));
 
         // Amend the last commit with the new message
         try {
@@ -805,22 +807,22 @@ Reason for improvement: ${analysis.reason}
           // Set the global flag to indicate a commit was optimized in this session
           commitsOptimizedInSession = true;
 
-          logger.success(green(`Last commit amended successfully`));
+          logger.success(green(`[OPTIMIZE] Last commit amended successfully`));
         } catch (error) {
-          logger.error(red(`Failed to amend commit: ${(error as Error).message}`));
+          logger.error(red(`[OPTIMIZE] Failed to amend commit: ${(error as Error).message}`));
           throw new Error('Could not amend commit message');
         }
       } else {
-        logger.info(yellow(`Skipping amendment for last commit`));
+        logger.info(yellow(`[OPTIMIZE] Skipping amendment for last commit`));
       }
     } else {
       await markCommitAsCreatedByTool(git, lastCommit.hash);
       commitsOptimizedInSession = true;
-      logger.info(yellow(`No changes needed for last commit: ${analysis.reason}`));
+      logger.info(yellow(`[OPTIMIZE] No changes needed for last commit: ${analysis.reason}`));
     }
   } catch (e) {
-    logger.error(red(`Failed to optimize last commit: ${(e as Error).message}`));
-    logger.debug('Raw response:', res);
+    logger.error(red(`[OPTIMIZE] Failed to optimize last commit: ${(e as Error).message}`));
+    logger.debug('[OPTIMIZE] Raw response:', res);
     throw new Error('Commit message optimization failed');
   }
 
@@ -828,37 +830,34 @@ Reason for improvement: ${analysis.reason}
   try {
     const updatedCommit = await git.log(['-1']);
     if (updatedCommit && updatedCommit.latest) {
-      logger.info(green('Last commit after optimization:'));
+      logger.info(green('[OPTIMIZE] Last commit after optimization:'));
       logger.info(`${updatedCommit.latest?.hash?.substring(0, 7) ?? ''} - ${updatedCommit.latest?.message ?? ''}`);
     } else {
-      logger.warn(yellow('Updated commit information is undefined.'));
+      logger.warn(yellow('[OPTIMIZE] Updated commit information is undefined.'));
     }
   } catch (error) {
-    logger.warn(yellow(`Failed to retrieve updated commit: ${(error as Error).message}`));
+    logger.warn(yellow(`[OPTIMIZE] Failed to retrieve updated commit: ${(error as Error).message}`));
     // Not a critical error, so we don't throw
   }
 
-  logger.success(green('Commit message optimization complete'));
+  logger.success(green('[OPTIMIZE] Commit message optimization complete'));
 }
 
 /**
- * Creates a new branch and pushes it to remote, then creates a PR
+ * Creates and pushes a pull request with AI-generated details
  *
  * This function:
- * 1. Gets the latest commit message to use as context
- * 2. Generates a branch name, PR title, and description using AI
- * 3. Creates a new branch if the current branch is target branch
+ * 1. Checks if the current branch already has an open PR
+ * 2. If an open PR exists, updates it with new commits and optionally updates the PR description
+ * 3. If no open PR exists, generates a new branch name, PR title, and description using AI
  * 4. Pushes the branch to the remote repository
- * 5. Either creates a PR using GitHub CLI or provides instructions for manual creation
- *
- * The AI-generated PR content is based on commit messages and follows best practices
- * for PR descriptions, including summary, changes made, and testing information.
+ * 5. Creates a new PR using the GitHub CLI or provides manual instructions if the CLI is unavailable
  *
  * @param git - SimpleGit instance for git operations
- * @param upstreamBranch - Name of the upstream branch to target for the PR
- * @param draft - Flag indicating whether to create the PR as a draft
+ * @param upstreamBranch - Name of the upstream branch to compare against
+ * @param draft - Whether to create the PR as a draft
  * @param confirm - Function to handle confirmations (respects --yes flag)
- * @returns Promise that resolves when PR creation is complete or canceled
+ * @returns Promise that resolves when the PR is created or updated
  */
 async function createAndPushPR(
   git: SimpleGit,
@@ -866,24 +865,24 @@ async function createAndPushPR(
   draft: boolean | undefined,
   confirm: (message: string, options?: PromptOptions) => Promise<unknown>
 ) {
-  logger.info(green('Preparing to create or update a PR'));
+  logger.info(green('[PR-CREATE] Preparing to create or update a PR'));
 
   if (!upstreamBranch) {
-    logger.error(red('Upstream branch is undefined.'));
+    logger.error(red('[PR-CREATE] Upstream branch is undefined.'));
     return;
   }
 
   // Get the latest commit to use for branch name suggestion and PR details
-  logger.info(yellow('Fetching latest commit for PR details...'));
+  logger.info(yellow('[PR-CREATE] Fetching latest commit for PR details...'));
   let latestCommit;
   try {
     latestCommit = await git.log(['-1']);
     if (!latestCommit || !latestCommit.latest) {
-      logger.error(red('Latest commit information is undefined.'));
+      logger.error(red('[PR-CREATE] Latest commit information is undefined.'));
       throw new Error('Could not retrieve latest commit information');
     }
   } catch (error) {
-    logger.error(red(`Failed to get latest commit: ${(error as Error).message}`));
+    logger.error(red(`[PR-CREATE] Failed to get latest commit: ${(error as Error).message}`));
     throw new Error('Could not retrieve latest commit information');
   }
 
@@ -894,34 +893,34 @@ async function createAndPushPR(
   try {
     branchSummary = await git.branch();
     if (!branchSummary || !branchSummary.current) {
-      logger.error(red('Branch summary or current branch is undefined.'));
+      logger.error(red('[PR-CREATE] Branch summary or current branch is undefined.'));
       throw new Error('Could not determine current branch');
     }
   } catch (error) {
-    logger.error(red(`Failed to get current branch information: ${(error as Error).message}`));
+    logger.error(red(`[PR-CREATE] Failed to get current branch information: ${(error as Error).message}`));
     throw new Error('Could not determine current branch');
   }
 
   const currentBranch = branchSummary.current;
 
   // Check if the current branch already has an open PR
-  logger.info(yellow('Checking if the current branch already has an open PR...'));
+  logger.info(yellow('[PR-CREATE] Checking if the current branch already has an open PR...'));
   const existingPR = await checkForExistingPR(currentBranch);
 
   if (existingPR) {
-    logger.info(green(`Found existing PR #${existingPR.number} for branch "${currentBranch}"`));
-    logger.info(yellow('Title: ') + existingPR.title);
-    logger.info(yellow('URL: ') + existingPR.url);
+    logger.info(green(`[PR-CREATE] Found existing PR #${existingPR.number} for branch "${currentBranch}"`));
+    logger.info(yellow('[PR-CREATE] Title: ') + existingPR.title);
+    logger.info(yellow('[PR-CREATE] URL: ') + existingPR.url);
 
     const updateExistingPR = await confirm('Do you want to update this existing PR?');
 
     if (updateExistingPR) {
       // Push new commits to the existing branch
-      logger.info(yellow(`Pushing to branch "${currentBranch}" to update PR #${existingPR.number}...`));
+      logger.info(yellow(`[PR-CREATE] Pushing to branch "${currentBranch}" to update PR #${existingPR.number}...`));
       try {
         await git.push('origin', currentBranch);
-        logger.success(green(`Successfully pushed updates to PR #${existingPR.number}`));
-        logger.info(green(`PR URL: ${existingPR.url}`));
+        logger.success(green(`[PR-CREATE] Successfully pushed updates to PR #${existingPR.number}`));
+        logger.info(green(`[PR-CREATE] PR URL: ${existingPR.url}`));
 
         // Check if there are new commits to determine if we should prompt for PR description update
         // Note: This will include the commit(s) we just pushed
@@ -936,33 +935,35 @@ async function createAndPushPR(
 
           if (hasNewCommits) {
             // This count includes the commit we just pushed
-            logger.info(green(`Found ${prBranchCommits.all.length} commit(s) in the PR, including your recent push`));
+            logger.info(
+              green(`[PR-CREATE] Found ${prBranchCommits.all.length} commit(s) in the PR, including your recent push`)
+            );
 
             // Log the commits for clarity
             if (prBranchCommits.all.length > 0) {
-              logger.info(yellow('Commits in this PR:'));
+              logger.info(yellow('[PR-CREATE] Commits in this PR:'));
               prBranchCommits.all.forEach((commit) => {
                 logger.info(`  ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`);
               });
             }
           } else {
-            logger.info(yellow('No commits found to include in PR description update.'));
+            logger.info(yellow('[PR-CREATE] No commits found to include in PR description update.'));
           }
         } catch (error) {
-          logger.warn(yellow(`Failed to check for new commits: ${(error as Error).message}`));
+          logger.warn(yellow(`[PR-CREATE] Failed to check for new commits: ${(error as Error).message}`));
           // Default to prompting for update if we can't determine - safer to ask than to skip
           hasNewCommits = true;
-          logger.info(yellow('Unable to verify commits, will prompt for PR description update.'));
+          logger.info(yellow('[PR-CREATE] Unable to verify commits, will prompt for PR description update.'));
         }
 
         // Also consider if any commits were optimized or created during this session
         if (commitsOptimizedInSession) {
-          logger.info(green('Commits were optimized during this session.'));
+          logger.info(green('[PR-CREATE] Commits were optimized during this session.'));
           hasNewCommits = true;
         }
 
         if (commitsCreatedInSession) {
-          logger.info(green('New commits were created during this session.'));
+          logger.info(green('[PR-CREATE] New commits were created during this session.'));
           hasNewCommits = true;
         }
 
@@ -974,7 +975,7 @@ async function createAndPushPR(
           );
 
           if (updatePrDescription) {
-            logger.info(yellow('Generating updated PR title and description...'));
+            logger.info(yellow('[PR-CREATE] Generating updated PR title and description...'));
 
             // Get the current PR title and description
             let currentTitle = existingPR.title || '';
@@ -997,11 +998,11 @@ async function createAndPushPR(
               const prDetailsObj = JSON.parse(prDetails.trim());
               currentTitle = prDetailsObj.title || '';
               currentDescription = prDetailsObj.body || '';
-              logger.debug(`Retrieved current PR title: "${currentTitle}"`);
-              logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
+              logger.debug(`[PR-CREATE] Retrieved current PR title: "${currentTitle}"`);
+              logger.debug(`[PR-CREATE] Retrieved current PR description (${currentDescription.length} chars)`);
             } catch (error) {
-              logger.warn(yellow(`Failed to get current PR details: ${(error as Error).message}`));
-              logger.info(yellow('Will generate new content without the previous title/description'));
+              logger.warn(yellow(`[PR-CREATE] Failed to get current PR details: ${(error as Error).message}`));
+              logger.info(yellow('[PR-CREATE] Will generate new content without the previous title/description'));
             }
 
             // Get new commits since the PR was created
@@ -1018,7 +1019,7 @@ async function createAndPushPR(
                   .join('\n');
               }
             } catch (error) {
-              logger.warn(yellow(`Failed to get new commits: ${(error as Error).message}`));
+              logger.warn(yellow(`[PR-CREATE] Failed to get new commits: ${(error as Error).message}`));
             }
 
             // Get the diff for new changes
@@ -1036,7 +1037,7 @@ async function createAndPushPR(
                 ':(exclude)*.lock'
               ]);
             } catch (error) {
-              logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
+              logger.warn(yellow(`[PR-CREATE] Failed to get recent changes: ${(error as Error).message}`));
             }
 
             // Generate an updated PR title and description using AI
@@ -1079,11 +1080,11 @@ Please create a comprehensive title and description that:
               updatedDescriptionData = JSON.parse(updateRes.text);
 
               if (!updatedDescriptionData?.updatedTitle || !updatedDescriptionData?.updatedDescription) {
-                logger.error(red('Updated title or description missing from AI response'));
+                logger.error(red('[PR-CREATE] Updated title or description missing from AI response'));
                 throw new Error('Invalid AI response format for PR update');
               }
 
-              logger.info(green('Generated updated PR title and description'));
+              logger.info(green('[PR-CREATE] Generated updated PR title and description'));
               logger.info(`
 ---------------------------
 Updated PR Title:
@@ -1109,52 +1110,58 @@ ${updatedDescriptionData.updatedDescription.substring(0, 200)}... (truncated)
                     updatedDescriptionData.updatedDescription
                   ]);
 
-                  logger.success(green('Successfully updated PR title and description'));
+                  logger.success(green('[PR-CREATE] Successfully updated PR title and description'));
                 } catch (error) {
-                  logger.error(red(`Failed to update PR title and description: ${(error as Error).message}`));
-                  logger.info(yellow('You can manually update the PR with this title and description if needed'));
+                  logger.error(
+                    red(`[PR-CREATE] Failed to update PR title and description: ${(error as Error).message}`)
+                  );
+                  logger.info(
+                    yellow('[PR-CREATE] You can manually update the PR with this title and description if needed')
+                  );
                 }
               } else {
-                logger.info(yellow('PR title and description update skipped'));
+                logger.info(yellow('[PR-CREATE] PR title and description update skipped'));
               }
             } catch (e) {
               logger.error(
-                red(`Failed to parse AI response for updated PR title and description: ${(e as Error).message}`)
+                red(
+                  `[PR-CREATE] Failed to parse AI response for updated PR title and description: ${(e as Error).message}`
+                )
               );
-              logger.debug('Raw response:', updateRes);
+              logger.debug('[PR-CREATE] Raw response:', updateRes);
             }
           }
         }
 
         return;
       } catch (error) {
-        logger.error(red(`Failed to push to remote: ${(error as Error).message}`));
+        logger.error(red(`[PR-CREATE] Failed to push to remote: ${(error as Error).message}`));
         throw new Error(`Could not push branch ${currentBranch} to remote`);
       }
     } else {
-      logger.info(yellow('Update cancelled. Will create a new branch and PR instead.'));
+      logger.info(yellow('[PR-CREATE] Update cancelled. Will create a new branch and PR instead.'));
     }
   }
 
   const generatePrDetails = await confirm('Generate PR details with AI based on your commits?');
 
   if (!generatePrDetails) {
-    logger.info(yellow('PR creation cancelled'));
+    logger.info(yellow('[PR-CREATE] PR creation cancelled'));
     return;
   }
 
   // Generate PR details using LLM
-  logger.info(yellow('Requesting PR suggestions from AI...'));
+  logger.info(yellow('[PR-CREATE] Requesting PR suggestions from AI...'));
   // get existing branch names to exclude them from suggestions
   let existingBranches;
   try {
     existingBranches = await git.branchLocal();
     if (!existingBranches || !Array.isArray(existingBranches.all)) {
-      logger.warn(yellow('Local branches information is undefined.'));
+      logger.warn(yellow('[PR-CREATE] Local branches information is undefined.'));
       existingBranches = { all: [] };
     }
   } catch (error) {
-    logger.warn(yellow(`Failed to get local branches: ${(error as Error).message}`));
+    logger.warn(yellow(`[PR-CREATE] Failed to get local branches: ${(error as Error).message}`));
     existingBranches = { all: [] };
   }
 
@@ -1166,7 +1173,7 @@ ${updatedDescriptionData.updatedDescription.substring(0, 200)}... (truncated)
   try {
     fullDiff = await git.diff([upstreamBranch, 'HEAD']);
   } catch (error) {
-    logger.warn(yellow(`Failed to get full diff for PR suggestion: ${(error as Error).message}`));
+    logger.warn(yellow(`[PR-CREATE] Failed to get full diff for PR suggestion: ${(error as Error).message}`));
   }
 
   const prPrompt = `
@@ -1211,7 +1218,7 @@ ${fullDiff}
       !prData.prTitle ||
       !prData.prDescription
     ) {
-      logger.error(red('AI PR data is missing required fields.'));
+      logger.error(red('[PR-CREATE] AI PR data is missing required fields.'));
       throw new Error('Invalid PR data from AI');
     }
 
@@ -1235,69 +1242,73 @@ Branch name: ${prData.suggestedBranchName}
       if (currentBranch === targetBranchName && !existingPR) {
         // Create a new branch
         logger.info(
-          yellow(`Current branch is the same as target branch. Creating new branch: ${prData.suggestedBranchName}...`)
+          yellow(
+            `[PR-CREATE] Current branch is the same as target branch. Creating new branch: ${prData.suggestedBranchName}...`
+          )
         );
         if (!prData.suggestedBranchName) {
-          logger.error(red('Suggested branch name is undefined.'));
+          logger.error(red('[PR-CREATE] Suggested branch name is undefined.'));
           return;
         }
         const createBranchConfirm = await confirm(`Confirm creation of branch "${prData.suggestedBranchName}"?`);
 
         if (!createBranchConfirm) {
-          logger.info(yellow('Branch creation cancelled'));
+          logger.info(yellow('[PR-CREATE] Branch creation cancelled'));
           return;
         }
 
         try {
           await git.checkoutLocalBranch(prData.suggestedBranchName);
           branchToPush = prData.suggestedBranchName;
-          logger.success(green(`Created and switched to branch: ${branchToPush}`));
+          logger.success(green(`[PR-CREATE] Created and switched to branch: ${branchToPush}`));
         } catch (error) {
-          logger.error(red(`Failed to create and checkout branch: ${(error as Error).message}`));
+          logger.error(red(`[PR-CREATE] Failed to create and checkout branch: ${(error as Error).message}`));
           throw new Error(`Could not create branch: ${prData.suggestedBranchName}`);
         }
       } else {
         if (existingPR) {
-          logger.info(yellow(`Using current branch "${currentBranch}" to update existing PR #${existingPR.number}`));
+          logger.info(
+            yellow(`[PR-CREATE] Using current branch "${currentBranch}" to update existing PR #${existingPR.number}`)
+          );
         } else {
-          logger.info(yellow(`Using current branch "${currentBranch}" for PR`));
+          logger.info(yellow(`[PR-CREATE] Using current branch "${currentBranch}" for PR`));
         }
       }
 
       // Push to remote
-      logger.info(yellow(`Preparing to push branch "${branchToPush}" to remote...`));
+      logger.info(yellow(`[PR-CREATE] Preparing to push branch "${branchToPush}" to remote...`));
       if (!branchToPush) {
-        logger.error(red('Branch to push is undefined.'));
+        logger.error(red('[PR-CREATE] Branch to push is undefined.'));
         return;
       }
       const pushConfirm = await confirm(`Push branch "${branchToPush}" to remote repository?`);
 
       if (!pushConfirm) {
-        logger.info(yellow('Remote push cancelled'));
+        logger.info(yellow('[PR-CREATE] Remote push cancelled'));
         return;
       }
 
-      logger.info(yellow(`Pushing to remote repository...`));
+      logger.info(yellow(`[PR-CREATE] Pushing to remote repository...`));
       try {
         if (existingPR) {
           // Simple push for existing PR
           await git.push('origin', branchToPush);
-          logger.success(green(`Updated existing PR #${existingPR.number}`));
-          logger.info(green(`PR URL: ${existingPR.url}`));
+          logger.success(green(`[PR-CREATE] Updated existing PR #${existingPR.number}`));
+          logger.info(green(`[PR-CREATE] PR URL: ${existingPR.url}`));
         } else {
           // Set upstream for new branches
           await git.push('origin', branchToPush, ['--set-upstream']);
-          logger.success(green(`Pushed branch to remote`));
+          logger.success(green(`[PR-CREATE] Pushed branch to remote`));
         }
       } catch (error) {
-        logger.error(red(`Failed to push to remote: ${(error as Error).message}`));
+        logger.error(red(`[PR-CREATE] Failed to push to remote: ${(error as Error).message}`));
         throw new Error(`Could not push branch ${branchToPush} to remote`);
       }
 
       // Only create a new PR if one doesn't already exist
       if (!existingPR) {
         // Check GitHub CLI availability and configuration before offering to create PR
-        logger.info(yellow('Checking GitHub CLI availability...'));
+        logger.info(yellow('[PR-CREATE] Checking GitHub CLI availability...'));
         let isGitHubCliAvailable = false;
         let isGitHubCliConfigured = false;
 
@@ -1314,7 +1325,7 @@ Branch name: ${prData.suggestedBranchName}
             isGitHubCliConfigured = authExitCode === 0 && authStatus.includes('Logged in to');
 
             if (!isGitHubCliConfigured) {
-              logger.warn(yellow('GitHub CLI is installed but not properly configured.'));
+              logger.warn(yellow('[PR-CREATE] GitHub CLI is installed but not properly configured.'));
               logger.info(`
 To authenticate GitHub CLI, run the following command:
 $ gh auth login
@@ -1323,7 +1334,7 @@ For more information, visit: https://cli.github.com/manual/gh_auth_login
               `);
             }
           } else {
-            logger.warn(yellow('GitHub CLI is not installed on your system.'));
+            logger.warn(yellow('[PR-CREATE] GitHub CLI is not installed on your system.'));
             logger.info(`
 To install GitHub CLI:
 - macOS: brew install gh
@@ -1334,19 +1345,19 @@ For more information, visit: https://cli.github.com/manual/installation
             `);
           }
         } catch (error) {
-          logger.warn(yellow(`Failed to check GitHub CLI: ${(error as Error).message}`));
+          logger.warn(yellow(`[PR-CREATE] Failed to check GitHub CLI: ${(error as Error).message}`));
           isGitHubCliAvailable = false;
           isGitHubCliConfigured = false;
         }
 
         // Create PR using GitHub CLI if available, otherwise provide instructions
-        logger.info(yellow('Creating pull request...'));
+        logger.info(yellow('[PR-CREATE] Creating pull request...'));
         const createGhPrConfirm = await confirm('Create GitHub PR using GitHub CLI?');
 
         if (createGhPrConfirm) {
           if (!isGitHubCliAvailable || !isGitHubCliConfigured) {
-            logger.warn(yellow('GitHub CLI is not available or not properly configured.'));
-            logger.info(yellow('Create PR manually using:'));
+            logger.warn(yellow('[PR-CREATE] GitHub CLI is not available or not properly configured.'));
+            logger.info(yellow('[PR-CREATE] Create PR manually using:'));
             logger.info(`
 Title: ${prData.prTitle}
 Description: ${prData.prDescription}
@@ -1358,7 +1369,7 @@ To: ${upstreamBranch.replace('origin/', '')}
 
           try {
             const upstreamTarget = upstreamBranch.replace('origin/', '');
-            logger.info(yellow('Creating PR using GitHub CLI...'));
+            logger.info(yellow('[PR-CREATE] Creating PR using GitHub CLI...'));
             try {
               // Add draft flag if argv.draft is true
               const draftFlag = draft === true ? ['--draft'] : [];
@@ -1381,12 +1392,12 @@ To: ${upstreamBranch.replace('origin/', '')}
                 prUrl = viewOutput.trim();
               }
 
-              logger.success(green('Pull request created successfully!'));
-              logger.info(green(`PR URL: ${prUrl}`));
+              logger.success(green('[PR-CREATE] Pull request created successfully!'));
+              logger.info(green(`[PR-CREATE] PR URL: ${prUrl}`));
             } catch (error) {
               // Provide manual instructions if GitHub CLI fails or is not available
-              logger.warn(yellow(`Could not automatically create PR: ${(error as Error).message}`));
-              logger.info(yellow('Please create it manually with:'));
+              logger.warn(yellow(`[PR-CREATE] Could not automatically create PR: ${(error as Error).message}`));
+              logger.info(yellow('[PR-CREATE] Please create it manually with:'));
               logger.info(`
 Title: ${prData.prTitle}
 Description: ${prData.prDescription}
@@ -1395,8 +1406,8 @@ To: ${upstreamBranch.replace('origin/', '')}
 `);
             }
           } catch (error) {
-            logger.warn(yellow(`Failed to import execa module: ${(error as Error).message}`));
-            logger.info(yellow('Create PR manually using:'));
+            logger.warn(yellow(`[PR-CREATE] Failed to import execa module: ${(error as Error).message}`));
+            logger.info(yellow('[PR-CREATE] Create PR manually using:'));
             logger.info(`
 Title: ${prData.prTitle}
 Description: ${prData.prDescription}
@@ -1405,7 +1416,7 @@ To: ${upstreamBranch.replace('origin/', '')}
 `);
           }
         } else {
-          logger.info(yellow('GitHub CLI PR creation skipped. Create PR manually using:'));
+          logger.info(yellow('[PR-CREATE] GitHub CLI PR creation skipped. Create PR manually using:'));
           logger.info(`
 Title: ${prData.prTitle}
 Description: ${prData.prDescription}
@@ -1415,11 +1426,11 @@ To: ${upstreamBranch.replace('origin/', '')}
         }
       }
     } else {
-      logger.info(yellow('PR creation cancelled'));
+      logger.info(yellow('[PR-CREATE] PR creation cancelled'));
     }
   } catch (e) {
-    logger.error(red(`Failed to parse LLM response for PR details: ${(e as Error).message}`));
-    logger.debug('Raw response:', res);
+    logger.error(red(`[PR-CREATE] Failed to parse LLM response for PR details: ${(e as Error).message}`));
+    logger.debug('[PR-CREATE] Raw response:', res);
     throw new Error('Could not generate PR details');
   }
 }

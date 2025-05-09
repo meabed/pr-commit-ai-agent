@@ -168,6 +168,115 @@ ggpr config
 4. **Branch Creation**: Create a branch with an AI-generated name.
 5. **PR Creation**: Generate a PR with an AI-generated title and description.
 
+### Workflow Diagram
+
+```mermaid
+flowchart TD
+    Start([Start GGPR]) --> InitConfig[Initialize Configs & Settings]
+    InitConfig --> GitStatus[Get Git Status]
+    GitStatus --> BranchCheck{Determine\nTarget Branch}
+
+    %% Branch Selection Flow
+    BranchCheck -->|Find Tracking Branch| TrackingExists{Tracking\nBranch Exists?}
+    TrackingExists -->|Yes| ConfirmTracking{Confirm\nTracking Branch?}
+    TrackingExists -->|No| FetchRemotes[Fetch Remote Branches]
+    ConfirmTracking -->|Yes| UseTracking[Use Tracking Branch]
+    ConfirmTracking -->|No| FetchRemotes
+    FetchRemotes --> UserSelectBranch[User Selects Branch]
+    UserSelectBranch --> ConfirmBranch{Confirm\nBranch Selection?}
+    ConfirmBranch -->|Yes| TargetBranchSet[Set Target Branch]
+    ConfirmBranch -->|No| ExitProcess([Exit Process])
+    UseTracking --> TargetBranchSet
+
+    %% Uncommitted Changes Flow
+    TargetBranchSet --> CheckChanges{Working Dir\nClean?}
+    CheckChanges -->|Yes| OptimizeCommits[Optimize Commit Messages]
+    CheckChanges -->|No| HandleChanges{Commit\nChanges?}
+    HandleChanges -->|No| ExitProcess
+    HandleChanges -->|Yes| AnalyzeChanges[Analyze Changes with AI]
+    AnalyzeChanges --> CollectModified[Collect Modified Files]
+    CollectModified --> GetDiffs[Get Diffs for Each File]
+    GetDiffs --> AskAI{Send to AI\nfor Analysis?}
+    AskAI -->|No| ExitProcess
+    AskAI -->|Yes| GenerateCommitMsg[Generate Commit Message]
+    GenerateCommitMsg --> ConfirmCommit{Proceed with\nCommit?}
+    ConfirmCommit -->|No| ExitProcess
+    ConfirmCommit -->|Yes| CreateCommit[Create Commit]
+    CreateCommit --> MarkCommit[Mark as Created by Tool]
+    MarkCommit --> OptimizeCommits
+
+    %% Optimize Commits Flow
+    OptimizeCommits --> CommitsExists{Commits to\nOptimize?}
+    CommitsExists -->|No| CheckPRFlag
+    CommitsExists -->|Yes| OptimizeConfirm{Optimize\nCommits?}
+    OptimizeConfirm -->|No| CheckPRFlag
+    OptimizeConfirm -->|Yes| CheckLastCommit[Check Last Commit]
+    CheckLastCommit --> IsCreatedByTool{Created by\nThis Tool?}
+    IsCreatedByTool -->|Yes| CheckPRFlag
+    IsCreatedByTool -->|No| IsMergeCommit{Is Merge\nCommit?}
+    IsMergeCommit -->|Yes| CheckPRFlag
+    IsMergeCommit -->|No| AnalyzeCommit[Analyze with Full Context]
+    AnalyzeCommit --> AINeedsImprovement{Needs\nImprovement?}
+    AINeedsImprovement -->|No| MarkNoChanges[Mark as Processed]
+    AINeedsImprovement -->|Yes| ConfirmAmend{Amend\nCommit?}
+    ConfirmAmend -->|No| CheckPRFlag
+    ConfirmAmend -->|Yes| AmendCommit[Amend Commit Message]
+    AmendCommit --> MarkAmended[Mark as Created by Tool]
+    MarkAmended --> CheckPRFlag
+    MarkNoChanges --> CheckPRFlag
+
+    %% PR Creation Flow
+    CheckPRFlag{Create PR?} -->|No| Complete([Complete])
+    CheckPRFlag -->|Yes| ConfirmPR{Proceed with\nCreating PR?}
+    ConfirmPR -->|No| Complete
+    ConfirmPR -->|Yes| CheckExistingPR[Check for Existing PR]
+    CheckExistingPR --> ExistingPR{PR Already\nExists?}
+
+    %% Existing PR Flow
+    ExistingPR -->|Yes| ConfirmUpdate{Update\nExisting PR?}
+    ConfirmUpdate -->|No| GeneratePRDetails
+    ConfirmUpdate -->|Yes| PushToExisting[Push to Existing PR]
+    PushToExisting --> CheckNewCommits[Check for New Commits]
+    CheckNewCommits --> UpdatePRDesc{Update PR\nDescription?}
+    UpdatePRDesc -->|No| Complete
+    UpdatePRDesc -->|Yes| GenerateUpdatedDesc[Generate Updated Title/Description]
+    GenerateUpdatedDesc --> ConfirmUpdateDesc{Apply\nUpdates?}
+    ConfirmUpdateDesc -->|No| Complete
+    ConfirmUpdateDesc -->|Yes| UpdatePR[Update PR Title/Description]
+    UpdatePR --> Complete
+
+    %% New PR Flow
+    ExistingPR -->|No| GeneratePRDetails[Generate PR Details with AI]
+    GeneratePRDetails --> ConfirmPRDetails{Create PR with\nthese Details?}
+    ConfirmPRDetails -->|No| Complete
+    ConfirmPRDetails -->|Yes| CheckBranchTarget{Current Branch\nis Target?}
+    CheckBranchTarget -->|Yes| CreateNewBranch[Create New Branch]
+    CheckBranchTarget -->|No| UseCurrentBranch[Use Current Branch]
+    CreateNewBranch --> ConfirmNewBranch{Confirm New\nBranch?}
+    ConfirmNewBranch -->|No| Complete
+    ConfirmNewBranch -->|Yes| CreateBranch[Create Branch]
+    CreateBranch --> PushBranch
+    UseCurrentBranch --> PushBranch[Push Branch to Remote]
+    PushBranch --> CreatePRWithGH{Create PR using\nGitHub CLI?}
+    CreatePRWithGH -->|No| ShowManualInstructions[Show Manual PR Instructions]
+    CreatePRWithGH -->|Yes| GHCliAvailable{GitHub CLI\nAvailable?}
+    GHCliAvailable -->|No| ShowManualInstructions
+    GHCliAvailable -->|Yes| CreatePRGH[Create PR with GitHub CLI]
+    CreatePRGH --> PRSuccess[PR Created Successfully]
+    ShowManualInstructions --> Complete
+    PRSuccess --> Complete
+
+    classDef processNode fill:#d4f1f9,stroke:#0e5974,stroke-width:1px;
+    classDef decisionNode fill:#ffe6cc,stroke:#d79b00,stroke-width:1px;
+    classDef startEndNode fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+    classDef errorNode fill:#f8cecc,stroke:#b85450,stroke-width:1px;
+
+    class Start,Complete,ExitProcess startEndNode;
+    class BranchCheck,TrackingExists,ConfirmTracking,ConfirmBranch,CheckChanges,HandleChanges,AskAI,ConfirmCommit,CommitsExists,OptimizeConfirm,IsCreatedByTool,IsMergeCommit,AINeedsImprovement,ConfirmAmend,CheckPRFlag,ConfirmPR,ExistingPR,ConfirmUpdate,UpdatePRDesc,ConfirmUpdateDesc,ConfirmPRDetails,CheckBranchTarget,ConfirmNewBranch,CreatePRWithGH,GHCliAvailable decisionNode;
+    class ExitProcess errorNode;
+    class InitConfig,GitStatus,FetchRemotes,UserSelectBranch,TargetBranchSet,AnalyzeChanges,CollectModified,GetDiffs,GenerateCommitMsg,CreateCommit,MarkCommit,OptimizeCommits,CheckLastCommit,AnalyzeCommit,MarkNoChanges,AmendCommit,MarkAmended,CheckExistingPR,PushToExisting,CheckNewCommits,GenerateUpdatedDesc,UpdatePR,GeneratePRDetails,CreateNewBranch,UseCurrentBranch,CreateBranch,PushBranch,ShowManualInstructions,CreatePRGH,PRSuccess processNode;
+```
+
 ---
 
 ## 🤝 Contributing

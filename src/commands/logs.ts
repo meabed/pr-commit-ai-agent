@@ -15,23 +15,25 @@ export const describe = 'View requests logs and responses to/from the LLM';
 export const aliases = ['l'];
 
 export async function handler() {
-  logger.info(bold(blue('LLM Request Logs Viewer')));
-  logger.info(yellow(`Looking for logs in: ${logDir}`));
+  logger.info(bold(blue('[LOGS-VIEWER] LLM Request Logs Viewer')));
+  logger.info(yellow(`[LOGS-VIEWER] Looking for logs in: ${logDir}`));
 
   try {
     // Ensure the log directory exists
     try {
       await fs.access(logDir);
     } catch (error) {
-      logger.error(red(`Log directory does not exist: ${logDir}`));
-      logger.info(yellow('No logs have been created yet. Use --log-request flag with commands to generate logs.'));
+      logger.error(red(`[LOGS-VIEWER] Log directory does not exist: ${logDir}`));
+      logger.info(
+        yellow('[LOGS-VIEWER] No logs have been created yet. Use --log-request flag with commands to generate logs.')
+      );
       return;
     }
 
     // Initialize viewer loop
     await viewLogsLoop();
   } catch (error) {
-    logger.error(red(`Error in logs handler: ${(error as Error).message}`));
+    logger.error(red(`[LOGS-VIEWER] Error in logs handler: ${(error as Error).message}`));
   }
 }
 
@@ -45,15 +47,15 @@ async function viewLogsLoop(): Promise<void> {
     const logFiles = await getLogFiles();
 
     if (logFiles.length === 0) {
-      logger.info(yellow('No log files found.'));
-      logger.info(yellow('Use --log-request flag with commands to generate logs.'));
+      logger.info(yellow('[LOGS-VIEWER] No log files found.'));
+      logger.info(yellow('[LOGS-VIEWER] Use --log-request flag with commands to generate logs.'));
       return;
     }
 
     // Add delete all logs and exit options to the list
     const options = [...logFiles.map((file) => file.name), 'Delete all logs', 'Exit log viewer'];
 
-    const selection = await logger.prompt(yellow('Select a log file to view:'), {
+    const selection = await logger.prompt(yellow('[LOGS-VIEWER] Select a log file to view:'), {
       type: 'select',
       options
     });
@@ -74,7 +76,7 @@ async function viewLogsLoop(): Promise<void> {
       // Check if there are still logs after deletion
       const remainingLogs = await getLogFiles();
       if (remainingLogs.length === 0) {
-        logger.info(green('All logs have been deleted.'));
+        logger.info(green('[LOGS-VIEWER] All logs have been deleted.'));
         return;
       }
       continue;
@@ -87,7 +89,7 @@ async function viewLogsLoop(): Promise<void> {
     }
   }
 
-  logger.info(green('Exited log viewer.'));
+  logger.info(green('[LOGS-VIEWER] Exited log viewer.'));
 }
 
 /**
@@ -96,14 +98,14 @@ async function viewLogsLoop(): Promise<void> {
 async function handleDeleteAllLogs(): Promise<void> {
   // Ask for confirmation before deleting
   const confirmDelete = await logger.prompt(
-    red('Are you sure you want to delete ALL log files? This cannot be undone.'),
+    red('[LOGS-VIEWER] Are you sure you want to delete ALL log files? This cannot be undone.'),
     {
       type: 'confirm'
     }
   );
 
   if (!confirmDelete) {
-    logger.info(yellow('Deletion cancelled.'));
+    logger.info(yellow('[LOGS-VIEWER] Deletion cancelled.'));
     return;
   }
 
@@ -115,7 +117,7 @@ async function handleDeleteAllLogs(): Promise<void> {
     const logFiles = files.filter((file) => file.startsWith('request-') || file.startsWith('llm-requests-'));
 
     if (logFiles.length === 0) {
-      logger.info(yellow('No log files to delete.'));
+      logger.info(yellow('[LOGS-VIEWER] No log files to delete.'));
       return;
     }
 
@@ -127,13 +129,13 @@ async function handleDeleteAllLogs(): Promise<void> {
         await fs.unlink(filePath);
         deletedCount++;
       } catch (error) {
-        logger.error(red(`Failed to delete file ${file}: ${(error as Error).message}`));
+        logger.error(red(`[LOGS-VIEWER] Failed to delete file ${file}: ${(error as Error).message}`));
       }
     }
 
-    logger.info(green(`Successfully deleted ${deletedCount} log files.`));
+    logger.info(green(`[LOGS-VIEWER] Successfully deleted ${deletedCount} log files.`));
   } catch (error) {
-    logger.error(red(`Failed to delete logs: ${(error as Error).message}`));
+    logger.error(red(`[LOGS-VIEWER] Failed to delete logs: ${(error as Error).message}`));
   }
 }
 
@@ -164,7 +166,7 @@ async function getLogFiles(): Promise<Array<{ name: string; path: string; timest
     // Sort by modification time, most recent first
     return fileStats.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   } catch (error) {
-    logger.error(red(`Failed to read log files: ${(error as Error).message}`));
+    logger.error(red(`[LOGS-VIEWER] Failed to read log files: ${(error as Error).message}`));
     return [];
   }
 }
@@ -181,19 +183,19 @@ async function displayLogFile(filePath: string): Promise<void> {
     if (path.basename(filePath).startsWith('llm-requests-')) {
       // JSONL file with multiple entries
       const lines = content.trim().split('\n');
-      logger.info(green(`Found ${lines.length} log entries in this file.`));
+      logger.info(green(`[LOGS-VIEWER] Found ${lines.length} log entries in this file.`));
 
       // Display each entry
       for (let i = 0; i < lines.length; i++) {
         const entryLine = lines?.[i]?.trim();
         if (entryLine) {
           const entry = JSON.parse(entryLine);
-          logger.info(bold(blue(`\n=== Log Entry ${i + 1} ===`)));
+          logger.info(bold(blue(`\n[LOGS-VIEWER] === Log Entry ${i + 1} ===`)));
           displayLogEntry(entry);
 
           // If there are more entries, prompt to continue
           if (i < lines.length - 1) {
-            const continueViewing = await logger.prompt(yellow('View next entry?'), {
+            const continueViewing = await logger.prompt(yellow('[LOGS-VIEWER] View next entry?'), {
               type: 'confirm'
             });
 
@@ -207,11 +209,11 @@ async function displayLogFile(filePath: string): Promise<void> {
       displayLogEntry(entry);
     }
   } catch (error) {
-    logger.error(red(`Failed to display log file: ${(error as Error).message}`));
+    logger.error(red(`[LOGS-VIEWER] Failed to display log file: ${(error as Error).message}`));
   }
 
   // Wait for user to continue
-  await logger.prompt(yellow('Press Enter to continue...'), {
+  await logger.prompt(yellow('[LOGS-VIEWER] Press Enter to continue...'), {
     type: 'text'
   });
 }
@@ -233,7 +235,7 @@ function displayLogEntry(entry: {
   response?: string;
 }): void {
   logger.box({
-    title: `LLM Request - ${entry.id}`,
+    title: `[LOGS-VIEWER] LLM Request - ${entry.id}`,
     provider: entry.provider,
     model: entry.model,
     timestamp: entry.timestamp,
@@ -242,20 +244,20 @@ function displayLogEntry(entry: {
 
   // Display the prompt
   if (entry.options?.prompt) {
-    logger.info(bold(yellow('Prompt:')));
+    logger.info(bold(yellow('[LOGS-VIEWER] Prompt:')));
     logger.info(entry.options.prompt.substring(0, 20000) + (entry.options.prompt.length > 20000 ? '...' : ''));
   }
 
   // Display error if present
   if (entry.error) {
-    logger.info(bold(red('Error:')));
+    logger.info(bold(red('[LOGS-VIEWER] Error:')));
     logger.info(red(entry.error));
     return;
   }
 
   // Display the response
   if (entry.response) {
-    logger.info(bold(green('Response:')));
+    logger.info(bold(green('[LOGS-VIEWER] Response:')));
     logger.info(entry.response.substring(0, 20000) + (entry.response.length > 20000 ? '...' : ''));
   }
 }
