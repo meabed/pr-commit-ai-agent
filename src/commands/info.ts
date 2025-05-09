@@ -27,14 +27,14 @@ export function builder(yargs: Argv): Argv<InfoArgv> {
 }
 
 export async function handler(argv: ArgumentsCamelCase<InfoArgv>) {
-  logger.info(bold(red('Basic command to display information.')));
-  logger.info(green('Node:'), bold(process.version));
-  logger.info(yellow('Processor architecture:'), process.arch);
-  logger.info(blue('Current dir:'), process.cwd());
-  logger.info(gray('Memory usage:'), process.memoryUsage());
-  logger.info(gray('Argv:'), argv);
+  logger.info(bold(red('[INFO] Basic command to display information.')));
+  logger.info(green('[INFO] Node:'), bold(process.version));
+  logger.info(yellow('[INFO] Processor architecture:'), process.arch);
+  logger.info(blue('[INFO] Current dir:'), process.cwd());
+  logger.info(gray('[INFO] Memory usage:'), process.memoryUsage());
+  logger.info(gray('[INFO] Argv:'), argv);
   if (argv.full) {
-    logger.box(gray(bold('Process config:')), process.config);
+    logger.box(gray(bold('[INFO] Process config:')), process.config);
   }
-  logger.info(`Config path: ${configInstance.path}`);
+  logger.info(`[INFO] Config path: ${configInstance.path}`);
 }

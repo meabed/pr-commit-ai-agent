@@ -52,7 +52,7 @@ function displayCurrentConfig() {
           ? '********'
           : '(not set)'
         : value || '(not set)';
-      logger.info(`  ${bold(key)}: ${displayValue}`);
+      logger.info(`${bold(key)}: ${displayValue}`);
     });
   }
 }
@@ -76,7 +76,7 @@ async function configurationLoop() {
     logger.info('9. Show current configuration values');
     logger.info('10. Exit configuration');
 
-    const choice = await logger.prompt(yellow('Select an option:'), {
+    const choice = await logger.prompt(yellow('[CONFIG] Select an option:'), {
       type: 'select',
       options: [
         '1. Set LLM provider',
@@ -131,14 +131,14 @@ async function configurationLoop() {
     }
   }
 
-  logger.info(green('Configuration saved. Exiting configuration manager.'));
+  logger.info(green('[CONFIG] Configuration saved. Exiting configuration manager.'));
 }
 
 /**
  * Configure the LLM provider
  */
 async function configureLLMProvider() {
-  const provider = await logger.prompt(yellow('Select LLM provider:'), {
+  const provider = await logger.prompt(yellow('[CONFIG] Select LLM provider:'), {
     type: 'select',
     options: ['openai', 'anthropic', 'deepseek', 'ollama', 'gemini']
   });
@@ -146,8 +146,8 @@ async function configureLLMProvider() {
   await performAction('set', 'llmProvider', provider);
 
   // Suggest setting a model after changing provider
-  logger.info(yellow('Remember to set an appropriate model for this provider'));
-  const setModel = await logger.prompt(yellow('Would you like to set a default model now?'), {
+  logger.info(yellow('[CONFIG] Remember to set an appropriate model for this provider'));
+  const setModel = await logger.prompt(yellow('[CONFIG] Would you like to set a default model now?'), {
     type: 'confirm'
   });
 
@@ -187,13 +187,13 @@ async function configureDefaultModel(provider?: string) {
   let model;
   if (suggestedModels.length > 0) {
     const modelOptions = [...suggestedModels, 'Enter custom model name'];
-    const selectedOption = await logger.prompt(yellow('Select or enter model name:'), {
+    const selectedOption = await logger.prompt(yellow('[CONFIG] Select or enter model name:'), {
       type: 'select',
       options: modelOptions
     });
 
     if (selectedOption === 'Enter custom model name') {
-      model = await logger.prompt(yellow('Enter custom model name:'), {
+      model = await logger.prompt(yellow('[CONFIG] Enter custom model name:'), {
         type: 'text',
         initial: config.model
       });
@@ -201,7 +201,7 @@ async function configureDefaultModel(provider?: string) {
       model = selectedOption;
     }
   } else {
-    model = await logger.prompt(yellow('Enter model name:'), {
+    model = await logger.prompt(yellow('[CONFIG] Enter model name:'), {
       type: 'text',
       initial: config.model
     });
@@ -216,7 +216,7 @@ async function configureDefaultModel(provider?: string) {
 async function configureProvider(provider: string) {
   const providerConfig = config[provider as keyof typeof config] as Record<string, string>;
 
-  logger.info(bold(green(`\n=== ${provider.charAt(0).toUpperCase() + provider.slice(1)} Configuration ===`)));
+  logger.info(bold(green(`\n[CONFIG] === ${provider.charAt(0).toUpperCase() + provider.slice(1)} Configuration ===`)));
 
   // Loop through each setting for the provider
   for (const [key, value] of Object.entries(providerConfig)) {
@@ -226,7 +226,7 @@ async function configureProvider(provider: string) {
     if (key === 'baseURL' && provider === 'ollama') {
       const options = ['http://localhost:11434/api/generate', 'http://localhost:11434/api/chat', 'Enter custom URL'];
 
-      const selectedOption = await logger.prompt(yellow(`Select ${key}:`), {
+      const selectedOption = await logger.prompt(yellow(`[CONFIG] Select ${key}:`), {
         type: 'select',
         options,
         initial: options.includes(value) ? value : options[0]
@@ -234,7 +234,7 @@ async function configureProvider(provider: string) {
 
       const newValue =
         selectedOption === 'Enter custom URL'
-          ? await logger.prompt(yellow('Enter custom URL:'), {
+          ? await logger.prompt(yellow('[CONFIG] Enter custom URL:'), {
               type: 'text',
               initial: value
             })
@@ -245,7 +245,7 @@ async function configureProvider(provider: string) {
       }
     } else {
       // Standard prompt for other settings
-      const newValue = await logger.prompt(yellow(`Enter ${key} (leave empty to keep current):`), {
+      const newValue = await logger.prompt(yellow(`[CONFIG] Enter ${key} (leave empty to keep current):`), {
         type: 'text',
         initial: displayValue
       });
@@ -258,13 +258,13 @@ async function configureProvider(provider: string) {
   }
 
   // After configuring a provider, offer to set it as default
-  const makeDefault = await logger.prompt(yellow(`Set ${provider} as your default LLM provider?`), {
+  const makeDefault = await logger.prompt(yellow(`[CONFIG] Set ${provider} as your default LLM provider?`), {
     type: 'confirm'
   });
 
   if (makeDefault) {
     await performAction('set', 'llmProvider', provider);
-    logger.info(green(`${provider.charAt(0).toUpperCase() + provider.slice(1)} set as default provider.`));
+    logger.info(green(`[CONFIG] ${provider.charAt(0).toUpperCase() + provider.slice(1)} set as default provider.`));
   }
 }
 
@@ -272,13 +272,13 @@ async function configureProvider(provider: string) {
  * Reset configuration to defaults
  */
 async function resetConfig() {
-  const confirm = await logger.prompt(red('Are you sure you want to reset all settings to defaults?'), {
+  const confirm = await logger.prompt(red('[CONFIG] Are you sure you want to reset all settings to defaults?'), {
     type: 'confirm'
   });
 
   if (confirm) {
     await performAction('reset');
-    logger.info(green('All settings have been reset to defaults.'));
+    logger.info(green('[CONFIG] All settings have been reset to defaults.'));
   }
 }
 

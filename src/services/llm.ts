@@ -116,18 +116,18 @@ function initializeClients(): void {
         apiKey: config.openai.apiKey,
         baseURL: config.openai.baseURL
       });
-      logger.debug('OpenAI client initialized successfully');
+      logger.debug('[LLM-INIT] OpenAI client initialized successfully');
     } else {
-      logger.debug('Skipping OpenAI client initialization: No API key provided');
+      logger.debug('[LLM-INIT] Skipping OpenAI client initialization: No API key provided');
     }
 
     if (config.anthropic?.apiKey) {
       anthropicClient = new Anthropic({
         apiKey: config.anthropic.apiKey
       });
-      logger.debug('Anthropic client initialized successfully');
+      logger.debug('[LLM-INIT] Anthropic client initialized successfully');
     } else {
-      logger.debug('Skipping Anthropic client initialization: No API key provided');
+      logger.debug('[LLM-INIT] Skipping Anthropic client initialization: No API key provided');
     }
 
     if (config.gemini?.apiKey) {
@@ -135,12 +135,12 @@ function initializeClients(): void {
         apiKey: config.gemini.apiKey
       });
 
-      logger.debug('Google Gemini client initialized successfully');
+      logger.debug('[LLM-INIT] Google Gemini client initialized successfully');
     } else {
-      logger.debug('Skipping Google Gemini client initialization: No API key provided');
+      logger.debug('[LLM-INIT] Skipping Google Gemini client initialization: No API key provided');
     }
   } catch (error) {
-    logger.error(red(`Failed to initialize LLM clients: ${(error as Error).message}`));
+    logger.error(red(`[LLM-INIT] Failed to initialize LLM clients: ${(error as Error).message}`));
     throw new Error(`LLM client initialization failed: ${(error as Error).message}`);
   }
 }
@@ -151,9 +151,9 @@ function initializeClients(): void {
 async function ensureLogDirectory(): Promise<void> {
   try {
     await fs.mkdir(logDir, { recursive: true });
-    logger.debug(`LLM log directory ensured at: ${logDir}`);
+    logger.debug(`[LLM-LOGS] Log directory ensured at: ${logDir}`);
   } catch (error) {
-    logger.error(red(`Failed to create log directory: ${(error as Error).message}`));
+    logger.error(red(`[LLM-LOGS] Failed to create log directory: ${(error as Error).message}`));
     throw new Error(`Log directory creation failed: ${(error as Error).message}`);
   }
 }
@@ -173,11 +173,11 @@ async function logRequest(logEntry: LLMLogEntry): Promise<string> {
     // Save the request part separately in a structured JSON file for easy reuse
     await fs.writeFile(requestFilePath, JSON.stringify(logEntry, null, 2), { encoding: 'utf8' });
 
-    logger.info(green(`Request saved as ${requestFilePath} (ID: ${logEntry.id})`));
+    logger.info(green(`[LLM-LOGS] Request saved as ${requestFilePath} (ID: ${logEntry.id})`));
 
     return logEntry.id;
   } catch (error) {
-    logger.error(red(`Failed to log LLM request: ${(error as Error).message}`));
+    logger.error(red(`[LLM-LOGS] Failed to log LLM request: ${(error as Error).message}`));
     return logEntry.id;
   }
 }
@@ -235,7 +235,7 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
 
       logger.info(
         yellow(
-          `Input tokens: ${inputOutputCost.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
+          `[LLM-TOKENS] Input tokens: ${inputOutputCost.inputTokens}, Output tokens: ${inputOutputCost.outputTokens}, Cost: ${inputOutputCost.cost}`
         )
       );
 
@@ -251,7 +251,7 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
       model,
       input
     });
-    logger.info(yellow(`Input tokens: ${inputToken.inputTokens}`));
+    logger.info(yellow(`[LLM-TOKENS] Input tokens: ${inputToken.inputTokens}`));
 
     return {
       inputTokens: inputToken.inputTokens,
@@ -260,7 +260,7 @@ async function logTokensAndCost(model: string, input: string, output?: string): 
       cost: inputToken.cost
     };
   } catch (error) {
-    logger.warn(yellow(`Failed to calculate token usage: ${(error as Error).message}`));
+    logger.warn(yellow(`[LLM-TOKENS] Failed to calculate token usage: ${(error as Error).message}`));
     return undefined;
   }
 }
@@ -276,13 +276,13 @@ async function openaiGenerate(
   }
 
   const model = options.model || config.model || 'gpt-3.5-turbo';
-  logger.info(yellow(`Making OpenAI completion request with model: ${model}`));
+  logger.info(yellow(`[OPENAI] Making completion request with model: ${model}`));
 
   // Log input tokens
   await logTokensAndCost(model, options.prompt);
 
   logger.debug(
-    `OpenAI request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
+    `[OPENAI] Request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
   );
 
   const clientBaseUrl = openaiClient.baseURL;
@@ -348,13 +348,13 @@ async function anthropicGenerate(
   }
 
   const model = options.model || config.model || 'claude-3-sonnet-20240229';
-  logger.info(yellow(`Making Anthropic completion request with model: ${model}`));
+  logger.info(yellow(`[ANTHROPIC] Making completion request with model: ${model}`));
 
   // Log input tokens
   await logTokensAndCost(model, options.prompt);
 
   logger.debug(
-    `Anthropic request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
+    `[ANTHROPIC] Request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}`
   );
 
   try {
@@ -401,13 +401,13 @@ async function deepseekGenerate(
   const model = options.model || config.model || 'deepseek-chat';
   const apiUrl = config.deepseek?.baseURL || 'https://api.deepseek.com/v1/chat/completions';
 
-  logger.info(yellow(`Making DeepSeek completion request with model: ${model}`));
+  logger.info(yellow(`[DEEPSEEK] Making completion request with model: ${model}`));
 
   // Log input tokens
   await logTokensAndCost(model, options.prompt);
 
   logger.debug(
-    `DeepSeek request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}, url=${apiUrl}`
+    `[DEEPSEEK] Request params: temperature=${options.temperature || 0.1}, maxTokens=${options.maxTokens || 1000000}, url=${apiUrl}`
   );
 
   try {
@@ -466,12 +466,12 @@ async function ollamaGenerate(
   const model = options.model || config.model || 'llama2';
   const apiUrl = config.ollama?.baseURL || 'http://localhost:11434/api/generate';
 
-  logger.info(yellow(`Making Ollama completion request with model: ${model}`));
+  logger.info(yellow(`[OLLAMA] Making completion request with model: ${model}`));
 
   // Log input tokens
   await logTokensAndCost(model, options.prompt);
 
-  logger.debug(`Ollama request params: temperature=${options.temperature || 0.1}, url=${apiUrl}`);
+  logger.debug(`[OLLAMA] Request params: temperature=${options.temperature || 0.1}, url=${apiUrl}`);
 
   try {
     const body = JSON.stringify({
@@ -537,12 +537,12 @@ async function geminiGenerate(options: CompletionOptions): Promise<{
   }
 
   const model = options.model || config.model || 'gemini-1.5-pro';
-  logger.info(yellow(`Making Gemini completion request with model: ${model}`));
+  logger.info(yellow(`[GEMINI] Making completion request with model: ${model}`));
 
   // Log input tokens
   await logTokensAndCost(model, options.prompt);
 
-  logger.debug(`Gemini request params: temperature=${options.temperature || 0.1}, model=${model}`);
+  logger.debug(`[GEMINI] Request params: temperature=${options.temperature || 0.1}, model=${model}`);
 
   try {
     // Get the generative model
@@ -578,7 +578,7 @@ export const generateCompletion = async (
   provider: LLMProvider,
   options: CompletionOptions
 ): Promise<{ response: unknown; text: string; requestId: string }> => {
-  logger.info(yellow(`Generating completion using ${provider}...`));
+  logger.info(yellow(`[LLM] Generating completion using ${provider}...`));
 
   // Ensure clients are initialized
   if (!openaiClient && !anthropicClient && !geminiClient) {
@@ -587,7 +587,7 @@ export const generateCompletion = async (
 
   // Ensure log directory exists
   await ensureLogDirectory().catch((err) => {
-    logger.warn(yellow(`Failed to ensure log directory, but will continue: ${err.message}`));
+    logger.warn(yellow(`[LLM] Failed to ensure log directory, but will continue: ${err.message}`));
   });
 
   const startTime = Date.now();
@@ -666,7 +666,7 @@ export const generateCompletion = async (
     // Only log the request if the logRequest option is true
     if (options.logRequest) {
       await logRequest(logEntry).catch((err) => {
-        logger.warn(yellow(`Failed to log request, but will continue: ${err.message}`));
+        logger.warn(yellow(`[LLM] Failed to log request, but will continue: ${err.message}`));
       });
     }
 
@@ -679,15 +679,15 @@ export const generateCompletion = async (
     // Only log the error if the logRequest option is true
     if (options.logRequest) {
       await logRequest(logEntry).catch((err) => {
-        logger.warn(yellow(`Failed to log error request, but will continue: ${err.message}`));
+        logger.warn(yellow(`[LLM] Failed to log error request, but will continue: ${err.message}`));
       });
     }
 
-    logger.error(red(`Error generating completion with ${provider}: ${(error as Error).message}`));
+    logger.error(red(`[LLM] Error generating completion with ${provider}: ${(error as Error).message}`));
     throw error;
   }
 };
 
 // Initialize on module load
 initializeClients();
-ensureLogDirectory().catch((err) => logger.error(red(`Log directory initialization error: ${err.message}`)));
+ensureLogDirectory().catch((err) => logger.error(red(`[LLM-LOGS] Log directory initialization error: ${err.message}`)));
