@@ -79,8 +79,9 @@ let globalLogRequest: boolean = false;
 let model: string;
 let provider: LLMProvider;
 
-// Track whether commit messages were optimized during this session
+// Track whether commit messages were optimized or created during this session
 let commitsOptimizedInSession = false;
+let commitsCreatedInSession = false;
 
 /**
  * Namespace and message used for git notes to track commits created by this tool
@@ -499,6 +500,8 @@ ${commitData.commitMessage}
         // Mark this commit as created by pr-agent using git notes
         if (commitResult.commit) {
           await markCommitAsCreatedByTool(git, commitResult.commit);
+          // Track that we created a commit during this session
+          commitsCreatedInSession = true;
         }
       } catch (error) {
         logger.error(red(`Failed to create commit: ${(error as Error).message}`));
@@ -950,13 +953,18 @@ async function createAndPushPR(
           logger.info(yellow('Unable to verify commits, will prompt for PR description update.'));
         }
 
-        // Also consider if any commits were optimized during this session
+        // Also consider if any commits were optimized or created during this session
         if (commitsOptimizedInSession) {
           logger.info(green('Commits were optimized during this session.'));
           hasNewCommits = true;
         }
 
-        // Only prompt for PR description update if there are new commits or if commits were optimized
+        if (commitsCreatedInSession) {
+          logger.info(green('New commits were created during this session.'));
+          hasNewCommits = true;
+        }
+
+        // Only prompt for PR description update if there are new commits or if commits were created/optimized
         if (hasNewCommits) {
           // Ask if user wants to update the PR description with new changes
           const updatePrDescription = await confirm(
