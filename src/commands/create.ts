@@ -974,22 +974,34 @@ async function createAndPushPR(
           );
 
           if (updatePrDescription) {
-            logger.info(yellow('Generating updated PR description...'));
+            logger.info(yellow('Generating updated PR title and description...'));
 
-            // Get the current PR description
+            // Get the current PR title and description
+            let currentTitle = existingPR.title || '';
             let currentDescription = '';
             try {
               const { stdout: prDetails } = await execa(
                 'gh',
-                ['pr', 'view', existingPR.number.toString(), '--json', 'body', '--jq', '.body'],
+                [
+                  'pr',
+                  'view',
+                  existingPR.number.toString(),
+                  '--json',
+                  'title,body',
+                  '--jq',
+                  '{title: .title, body: .body}'
+                ],
                 { reject: false }
               );
 
-              currentDescription = prDetails.trim();
+              const prDetailsObj = JSON.parse(prDetails.trim());
+              currentTitle = prDetailsObj.title || '';
+              currentDescription = prDetailsObj.body || '';
+              logger.debug(`Retrieved current PR title: "${currentTitle}"`);
               logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
             } catch (error) {
-              logger.warn(yellow(`Failed to get current PR description: ${(error as Error).message}`));
-              logger.info(yellow('Will generate a new description without the previous content'));
+              logger.warn(yellow(`Failed to get current PR details: ${(error as Error).message}`));
+              logger.info(yellow('Will generate new content without the previous title/description'));
             }
 
             // Get new commits since the PR was created
@@ -1027,14 +1039,18 @@ async function createAndPushPR(
               logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
             }
 
-            // Generate an updated PR description using AI
+            // Generate an updated PR title and description using AI
             const updateDescriptionPrompt = `
-Generate an updated pull request description that incorporates both the original content and new changes.
+Generate an updated pull request title and description that incorporates both the original content and new changes.
 
 Format your response as a JSON object with the following structure:
 {
+  "updatedTitle": "The updated PR title",
   "updatedDescription": "The complete updated PR description with original content preserved when appropriate and new changes clearly highlighted"
 }
+
+Current PR title:
+${currentTitle || 'No current title available'}
 
 Current PR description:
 ${currentDescription || 'No current description available'}
@@ -1045,10 +1061,10 @@ ${newCommits || 'No new commit information available'}
 Recent changes:
 ${recentChanges || 'No recent changes information available'}
 
-Please create a comprehensive description that:
-1. Preserves relevant information from the original description
+Please create a comprehensive title and description that:
+1. Preserves relevant information from the original title and description
 2. Clearly highlights the new changes under a "## Recent Updates" section
-3. Ensures the description is well-formatted with proper markdown
+3. Ensures the title and description are well-formatted with proper markdown
 4. Keeps the total length reasonable (under 4000 characters)
 `;
 
@@ -1062,15 +1078,24 @@ Please create a comprehensive description that:
             try {
               updatedDescriptionData = JSON.parse(updateRes.text);
 
-              if (!updatedDescriptionData?.updatedDescription) {
-                logger.error(red('Updated description missing from AI response'));
-                throw new Error('Invalid AI response format for PR description update');
+              if (!updatedDescriptionData?.updatedTitle || !updatedDescriptionData?.updatedDescription) {
+                logger.error(red('Updated title or description missing from AI response'));
+                throw new Error('Invalid AI response format for PR update');
               }
 
-              logger.info(green('Generated updated PR description'));
+              logger.info(green('Generated updated PR title and description'));
+              logger.info(`
+---------------------------
+Updated PR Title:
+${updatedDescriptionData.updatedTitle}
 
-              // Ask the user if they want to apply the updated description
-              const confirmDescription = await confirm('Apply the updated PR description?');
+Updated PR Description:
+${updatedDescriptionData.updatedDescription.substring(0, 200)}... (truncated)
+---------------------------
+`);
+
+              // Ask the user if they want to apply the updated title and description
+              const confirmDescription = await confirm('Apply the updated PR title and description?');
 
               if (confirmDescription) {
                 try {
@@ -1078,20 +1103,24 @@ Please create a comprehensive description that:
                     'pr',
                     'edit',
                     existingPR.number.toString(),
+                    '--title',
+                    updatedDescriptionData.updatedTitle,
                     '--body',
                     updatedDescriptionData.updatedDescription
                   ]);
 
-                  logger.success(green('Successfully updated PR description'));
+                  logger.success(green('Successfully updated PR title and description'));
                 } catch (error) {
-                  logger.error(red(`Failed to update PR description: ${(error as Error).message}`));
-                  logger.info(yellow('You can manually update the PR with this description if needed'));
+                  logger.error(red(`Failed to update PR title and description: ${(error as Error).message}`));
+                  logger.info(yellow('You can manually update the PR with this title and description if needed'));
                 }
               } else {
-                logger.info(yellow('PR description update skipped'));
+                logger.info(yellow('PR title and description update skipped'));
               }
             } catch (e) {
-              logger.error(red(`Failed to parse AI response for updated PR description: ${(e as Error).message}`));
+              logger.error(
+                red(`Failed to parse AI response for updated PR title and description: ${(e as Error).message}`)
+              );
               logger.debug('Raw response:', updateRes);
             }
           }
