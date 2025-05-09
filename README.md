@@ -47,7 +47,7 @@ GGPR is an AI-powered CLI tool that **supercharges your Git workflow** by genera
 - **Node.js** v18+
 - **pnpm** (recommended) or npm
 - **Git** v2.25+
-- **GitHub CLI** (required for PR creation)
+- **GitHub CLI** (required for PR creation and updates)
 
 ---
 
