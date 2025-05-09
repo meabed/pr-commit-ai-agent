@@ -47,7 +47,7 @@ GGPR is an AI-powered CLI tool that **supercharges your Git workflow** by genera
 - **Node.js** v18+
 - **pnpm** (recommended) or npm
 - **Git** v2.25+
-- **GitHub CLI** (required for PR creation)
+- **GitHub CLI** (required for PR creation and updates, ensure it's installed and authenticated with the necessary scopes)
 
 ---
 
@@ -66,9 +66,9 @@ pnpm add -g pr-commit-ai-agent
 brew install gh
 
 # Authenticate GitHub CLI with proper scopes
-gh auth login
+gh auth login --scopes repo,read:org,read:discussion,gist
 
-# Verify GitHub CLI authentication status and scopes
+# Verify GitHub CLI authentication status and scopes and ensure you have the necessary scopes
 gh auth status
 
 # Ensure you have the necessary scopes for PR management

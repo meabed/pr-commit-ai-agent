@@ -79,6 +79,19 @@ let globalLogRequest: boolean = false;
 let model: string;
 let provider: LLMProvider;
 
+// Track whether commit messages were optimized or created during this session
+let commitsOptimizedInSession = false;
+let commitsCreatedInSession = false;
+
+/**
+ * Namespace and message used for git notes to track commits created by this tool
+ *
+ * Used to identify commits that have already been processed by PR Agent,
+ * preventing duplicate processing of the same commit.
+ */
+const PR_AGENT_NOTE_NAMESPACE = 'pr-agent';
+const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent';
+
 // Initialize global variables
 function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
   globalConfirm = async (message: string, options: PromptOptions = { type: 'confirm' }) => {
@@ -262,15 +275,6 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
  * to ensure the AI focuses on meaningful code changes and doesn't exceed context limits.
  */
 const ignoredFiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json'];
-
-/**
- * Namespace and message used for git notes to track commits created by this tool
- *
- * Used to identify commits that have already been processed by PR Agent,
- * preventing duplicate processing of the same commit.
- */
-const PR_AGENT_NOTE_NAMESPACE = 'pr-agent';
-const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent';
 
 /**
  * Determines the upstream branch to use as the target for PR creation
@@ -496,6 +500,8 @@ ${commitData.commitMessage}
         // Mark this commit as created by pr-agent using git notes
         if (commitResult.commit) {
           await markCommitAsCreatedByTool(git, commitResult.commit);
+          // Track that we created a commit during this session
+          commitsCreatedInSession = true;
         }
       } catch (error) {
         logger.error(red(`Failed to create commit: ${(error as Error).message}`));
@@ -796,6 +802,9 @@ Reason for improvement: ${analysis.reason}
           // Mark the amended commit as created by our tool
           await markCommitAsCreatedByTool(git, 'HEAD');
 
+          // Set the global flag to indicate a commit was optimized in this session
+          commitsOptimizedInSession = true;
+
           logger.success(green(`Last commit amended successfully`));
         } catch (error) {
           logger.error(red(`Failed to amend commit: ${(error as Error).message}`));
@@ -805,6 +814,8 @@ Reason for improvement: ${analysis.reason}
         logger.info(yellow(`Skipping amendment for last commit`));
       }
     } else {
+      await markCommitAsCreatedByTool(git, lastCommit.hash);
+      commitsOptimizedInSession = true;
       logger.info(yellow(`No changes needed for last commit: ${analysis.reason}`));
     }
   } catch (e) {
@@ -912,111 +923,134 @@ async function createAndPushPR(
         logger.success(green(`Successfully pushed updates to PR #${existingPR.number}`));
         logger.info(green(`PR URL: ${existingPR.url}`));
 
-        // Ask if user wants to update the PR description with new changes
-        const updatePrDescription = await confirm('Would you like to update the PR description with the new changes?');
+        // Check if there are new commits to determine if we should prompt for PR description update
+        // Note: This will include the commit(s) we just pushed
+        let hasNewCommits = false;
+        try {
+          const prBranchCommits = await git.log({
+            from: upstreamBranch,
+            to: 'HEAD'
+          });
 
-        if (updatePrDescription) {
-          logger.info(yellow('Checking GitHub CLI authentication scopes...'));
+          hasNewCommits = prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0;
 
-          // Check if GitHub CLI has the required scopes
-          let hasRequiredScopes = false;
-          try {
-            const { execa } = await import('execa');
-            const { stdout: scopesOutput, exitCode } = await execa('gh', ['auth', 'status'], { reject: false });
+          if (hasNewCommits) {
+            // This count includes the commit we just pushed
+            logger.info(green(`Found ${prBranchCommits.all.length} commit(s) in the PR, including your recent push`));
 
-            if (exitCode === 0) {
-              // Check if the output contains all required scopes
-              const requiredScopes = ['repo', 'read:org', 'read:discussion', 'gist'];
-              const missingScopeCheck = requiredScopes.some((scope) => !scopesOutput.includes(scope));
-
-              if (!missingScopeCheck) {
-                hasRequiredScopes = true;
-                logger.info(green('GitHub CLI has all required scopes'));
-              } else {
-                logger.warn(yellow('GitHub CLI missing required scopes for PR updates'));
-              }
-            }
-          } catch (error) {
-            logger.warn(yellow(`Failed to check GitHub CLI auth scopes: ${(error as Error).message}`));
-          }
-
-          // If missing scopes, request them
-          if (!hasRequiredScopes) {
-            logger.info(yellow('Requesting required GitHub authorization scopes...'));
-            try {
-              const { execa } = await import('execa');
-              await execa('gh', ['auth', 'refresh', '--scopes', 'repo,read:org,read:discussion,gist'], {
-                stdio: 'inherit', // Show the auth refresh prompt to the user
-                reject: false
+            // Log the commits for clarity
+            if (prBranchCommits.all.length > 0) {
+              logger.info(yellow('Commits in this PR:'));
+              prBranchCommits.all.forEach((commit) => {
+                logger.info(`  ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`);
               });
-              logger.success(green('GitHub authorization scopes refreshed'));
+            }
+          } else {
+            logger.info(yellow('No commits found to include in PR description update.'));
+          }
+        } catch (error) {
+          logger.warn(yellow(`Failed to check for new commits: ${(error as Error).message}`));
+          // Default to prompting for update if we can't determine - safer to ask than to skip
+          hasNewCommits = true;
+          logger.info(yellow('Unable to verify commits, will prompt for PR description update.'));
+        }
+
+        // Also consider if any commits were optimized or created during this session
+        if (commitsOptimizedInSession) {
+          logger.info(green('Commits were optimized during this session.'));
+          hasNewCommits = true;
+        }
+
+        if (commitsCreatedInSession) {
+          logger.info(green('New commits were created during this session.'));
+          hasNewCommits = true;
+        }
+
+        // Only prompt for PR description update if there are new commits or if commits were created/optimized
+        if (hasNewCommits) {
+          // Ask if user wants to update the PR description with new changes
+          const updatePrDescription = await confirm(
+            'Would you like to update the PR description with the new changes?'
+          );
+
+          if (updatePrDescription) {
+            logger.info(yellow('Generating updated PR title and description...'));
+
+            // Get the current PR title and description
+            let currentTitle = existingPR.title || '';
+            let currentDescription = '';
+            try {
+              const { stdout: prDetails } = await execa(
+                'gh',
+                [
+                  'pr',
+                  'view',
+                  existingPR.number.toString(),
+                  '--json',
+                  'title,body',
+                  '--jq',
+                  '{title: .title, body: .body}'
+                ],
+                { reject: false }
+              );
+
+              const prDetailsObj = JSON.parse(prDetails.trim());
+              currentTitle = prDetailsObj.title || '';
+              currentDescription = prDetailsObj.body || '';
+              logger.debug(`Retrieved current PR title: "${currentTitle}"`);
+              logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
             } catch (error) {
-              logger.error(red(`Failed to refresh GitHub auth scopes: ${(error as Error).message}`));
-              logger.info(yellow('Continuing with existing scopes, but PR update may fail'));
+              logger.warn(yellow(`Failed to get current PR details: ${(error as Error).message}`));
+              logger.info(yellow('Will generate new content without the previous title/description'));
             }
-          }
 
-          logger.info(yellow('Generating updated PR description...'));
+            // Get new commits since the PR was created
+            let newCommits = '';
+            try {
+              const prBranchCommits = await git.log({
+                from: upstreamBranch,
+                to: 'HEAD'
+              });
 
-          // Get the current PR description
-          let currentDescription = '';
-          try {
-            const { stdout: prDetails } = await execa(
-              'gh',
-              ['pr', 'view', existingPR.number.toString(), '--json', 'body', '--jq', '.body'],
-              { reject: false }
-            );
-
-            currentDescription = prDetails.trim();
-            logger.debug(`Retrieved current PR description (${currentDescription.length} chars)`);
-          } catch (error) {
-            logger.warn(yellow(`Failed to get current PR description: ${(error as Error).message}`));
-            logger.info(yellow('Will generate a new description without the previous content'));
-          }
-
-          // Get new commits since the PR was created
-          let newCommits = '';
-          try {
-            const prBranchCommits = await git.log({
-              from: upstreamBranch,
-              to: 'HEAD'
-            });
-
-            if (prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0) {
-              newCommits = prBranchCommits.all
-                .map((commit) => `- ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`)
-                .join('\n');
+              if (prBranchCommits && Array.isArray(prBranchCommits.all) && prBranchCommits.all.length > 0) {
+                newCommits = prBranchCommits.all
+                  .map((commit) => `- ${commit.hash.substring(0, 7)}: ${commit.message.split('\n')[0]}`)
+                  .join('\n');
+              }
+            } catch (error) {
+              logger.warn(yellow(`Failed to get new commits: ${(error as Error).message}`));
             }
-          } catch (error) {
-            logger.warn(yellow(`Failed to get new commits: ${(error as Error).message}`));
-          }
 
-          // Get the diff for new changes
-          let recentChanges = '';
-          try {
-            // Get the latest commit hash
-            const latestCommit = await git.revparse(['HEAD']);
-            // Get the diff of the latest commit
-            recentChanges = await git.show([
-              '-U3',
-              '--minimal',
-              latestCommit,
-              ...ignoredFiles.map((file) => `:(exclude)${file}`),
-              ':(exclude)*.generated.*',
-              ':(exclude)*.lock'
-            ]);
-          } catch (error) {
-            logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
-          }
+            // Get the diff for new changes
+            let recentChanges = '';
+            try {
+              // Get the latest commit hash
+              const latestCommit = await git.revparse(['HEAD']);
+              // Get the diff of the latest commit
+              recentChanges = await git.show([
+                '-U3',
+                '--minimal',
+                latestCommit,
+                ...ignoredFiles.map((file) => `:(exclude)${file}`),
+                ':(exclude)*.generated.*',
+                ':(exclude)*.lock'
+              ]);
+            } catch (error) {
+              logger.warn(yellow(`Failed to get recent changes: ${(error as Error).message}`));
+            }
 
-          // Generate an updated PR description using AI
-          const updateDescriptionPrompt = `
-Generate an updated pull request description that incorporates both the original content and new changes.
+            // Generate an updated PR title and description using AI
+            const updateDescriptionPrompt = `
+Generate an updated pull request title and description that incorporates both the original content and new changes.
 
 Format your response as a JSON object with the following structure:
 {
+  "updatedTitle": "The updated PR title",
   "updatedDescription": "The complete updated PR description with original content preserved when appropriate and new changes clearly highlighted"
 }
+
+Current PR title:
+${currentTitle || 'No current title available'}
 
 Current PR description:
 ${currentDescription || 'No current description available'}
@@ -1027,54 +1061,68 @@ ${newCommits || 'No new commit information available'}
 Recent changes:
 ${recentChanges || 'No recent changes information available'}
 
-Please create a comprehensive description that:
-1. Preserves relevant information from the original description
+Please create a comprehensive title and description that:
+1. Preserves relevant information from the original title and description
 2. Clearly highlights the new changes under a "## Recent Updates" section
-3. Ensures the description is well-formatted with proper markdown
+3. Ensures the title and description are well-formatted with proper markdown
 4. Keeps the total length reasonable (under 4000 characters)
 `;
 
-          const updateRes = await generateCompletion(provider, {
-            model,
-            logRequest: globalLogRequest,
-            prompt: updateDescriptionPrompt
-          });
+            const updateRes = await generateCompletion(provider, {
+              model,
+              logRequest: globalLogRequest,
+              prompt: updateDescriptionPrompt
+            });
 
-          let updatedDescriptionData;
-          try {
-            updatedDescriptionData = JSON.parse(updateRes.text);
+            let updatedDescriptionData;
+            try {
+              updatedDescriptionData = JSON.parse(updateRes.text);
 
-            if (!updatedDescriptionData?.updatedDescription) {
-              logger.error(red('Updated description missing from AI response'));
-              throw new Error('Invalid AI response format for PR description update');
-            }
-
-            logger.info(green('Generated updated PR description'));
-
-            // Ask the user if they want to apply the updated description
-            const confirmDescription = await confirm('Apply the updated PR description?');
-
-            if (confirmDescription) {
-              try {
-                await execa('gh', [
-                  'pr',
-                  'edit',
-                  existingPR.number.toString(),
-                  '--body',
-                  updatedDescriptionData.updatedDescription
-                ]);
-
-                logger.success(green('Successfully updated PR description'));
-              } catch (error) {
-                logger.error(red(`Failed to update PR description: ${(error as Error).message}`));
-                logger.info(yellow('You can manually update the PR with this description if needed'));
+              if (!updatedDescriptionData?.updatedTitle || !updatedDescriptionData?.updatedDescription) {
+                logger.error(red('Updated title or description missing from AI response'));
+                throw new Error('Invalid AI response format for PR update');
               }
-            } else {
-              logger.info(yellow('PR description update skipped'));
+
+              logger.info(green('Generated updated PR title and description'));
+              logger.info(`
+---------------------------
+Updated PR Title:
+${updatedDescriptionData.updatedTitle}
+
+Updated PR Description:
+${updatedDescriptionData.updatedDescription.substring(0, 200)}... (truncated)
+---------------------------
+`);
+
+              // Ask the user if they want to apply the updated title and description
+              const confirmDescription = await confirm('Apply the updated PR title and description?');
+
+              if (confirmDescription) {
+                try {
+                  await execa('gh', [
+                    'pr',
+                    'edit',
+                    existingPR.number.toString(),
+                    '--title',
+                    updatedDescriptionData.updatedTitle,
+                    '--body',
+                    updatedDescriptionData.updatedDescription
+                  ]);
+
+                  logger.success(green('Successfully updated PR title and description'));
+                } catch (error) {
+                  logger.error(red(`Failed to update PR title and description: ${(error as Error).message}`));
+                  logger.info(yellow('You can manually update the PR with this title and description if needed'));
+                }
+              } else {
+                logger.info(yellow('PR title and description update skipped'));
+              }
+            } catch (e) {
+              logger.error(
+                red(`Failed to parse AI response for updated PR title and description: ${(e as Error).message}`)
+              );
+              logger.debug('Raw response:', updateRes);
             }
-          } catch (e) {
-            logger.error(red(`Failed to parse AI response for updated PR description: ${(e as Error).message}`));
-            logger.debug('Raw response:', updateRes);
           }
         }
 
