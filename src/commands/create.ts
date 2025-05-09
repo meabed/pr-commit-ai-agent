@@ -79,6 +79,18 @@ let globalLogRequest: boolean = false;
 let model: string;
 let provider: LLMProvider;
 
+// Track whether commit messages were optimized during this session
+let commitsOptimizedInSession = false;
+
+/**
+ * Namespace and message used for git notes to track commits created by this tool
+ *
+ * Used to identify commits that have already been processed by PR Agent,
+ * preventing duplicate processing of the same commit.
+ */
+const PR_AGENT_NOTE_NAMESPACE = 'pr-agent';
+const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent';
+
 // Initialize global variables
 function initializeGlobals(argv: ArgumentsCamelCase<CreateArgv>) {
   globalConfirm = async (message: string, options: PromptOptions = { type: 'confirm' }) => {
@@ -262,15 +274,6 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
  * to ensure the AI focuses on meaningful code changes and doesn't exceed context limits.
  */
 const ignoredFiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json'];
-
-/**
- * Namespace and message used for git notes to track commits created by this tool
- *
- * Used to identify commits that have already been processed by PR Agent,
- * preventing duplicate processing of the same commit.
- */
-const PR_AGENT_NOTE_NAMESPACE = 'pr-agent';
-const PR_AGENT_NOTE_MESSAGE = 'created-by-pr-agent';
 
 /**
  * Determines the upstream branch to use as the target for PR creation
@@ -796,6 +799,9 @@ Reason for improvement: ${analysis.reason}
           // Mark the amended commit as created by our tool
           await markCommitAsCreatedByTool(git, 'HEAD');
 
+          // Set the global flag to indicate a commit was optimized in this session
+          commitsOptimizedInSession = true;
+
           logger.success(green(`Last commit amended successfully`));
         } catch (error) {
           logger.error(red(`Failed to amend commit: ${(error as Error).message}`));
@@ -944,7 +950,13 @@ async function createAndPushPR(
           logger.info(yellow('Unable to verify commits, will prompt for PR description update.'));
         }
 
-        // Only prompt for PR description update if there are new commits
+        // Also consider if any commits were optimized during this session
+        if (commitsOptimizedInSession) {
+          logger.info(green('Commits were optimized during this session.'));
+          hasNewCommits = true;
+        }
+
+        // Only prompt for PR description update if there are new commits or if commits were optimized
         if (hasNewCommits) {
           // Ask if user wants to update the PR description with new changes
           const updatePrDescription = await confirm(
