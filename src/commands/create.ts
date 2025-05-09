@@ -916,46 +916,6 @@ async function createAndPushPR(
         const updatePrDescription = await confirm('Would you like to update the PR description with the new changes?');
 
         if (updatePrDescription) {
-          logger.info(yellow('Checking GitHub CLI authentication scopes...'));
-
-          // Check if GitHub CLI has the required scopes
-          let hasRequiredScopes = false;
-          try {
-            const { execa } = await import('execa');
-            const { stdout: scopesOutput, exitCode } = await execa('gh', ['auth', 'status'], { reject: false });
-
-            if (exitCode === 0) {
-              // Check if the output contains all required scopes
-              const requiredScopes = ['repo', 'read:org', 'read:discussion', 'gist'];
-              const missingScopeCheck = requiredScopes.some((scope) => !scopesOutput.includes(scope));
-
-              if (!missingScopeCheck) {
-                hasRequiredScopes = true;
-                logger.info(green('GitHub CLI has all required scopes'));
-              } else {
-                logger.warn(yellow('GitHub CLI missing required scopes for PR updates'));
-              }
-            }
-          } catch (error) {
-            logger.warn(yellow(`Failed to check GitHub CLI auth scopes: ${(error as Error).message}`));
-          }
-
-          // If missing scopes, request them
-          if (!hasRequiredScopes) {
-            logger.info(yellow('Requesting required GitHub authorization scopes...'));
-            try {
-              const { execa } = await import('execa');
-              await execa('gh', ['auth', 'refresh', '--scopes', 'repo,read:org,read:discussion,gist'], {
-                stdio: 'inherit', // Show the auth refresh prompt to the user
-                reject: false
-              });
-              logger.success(green('GitHub authorization scopes refreshed'));
-            } catch (error) {
-              logger.error(red(`Failed to refresh GitHub auth scopes: ${(error as Error).message}`));
-              logger.info(yellow('Continuing with existing scopes, but PR update may fail'));
-            }
-          }
-
           logger.info(yellow('Generating updated PR description...'));
 
           // Get the current PR description
