@@ -73,7 +73,7 @@
     "giget": "2.0.0",
     "llm-cost": "^1.0.5",
     "ollama-ai-provider": "1.2.0",
-    "openai": "5.5.1",
+    "openai": "5.7.0",
     "picocolors": "1.1.1",
     "simple-git": "3.28.0",
     "uuid": "11.1.0",
@@ -82,15 +82,15 @@
   "devDependencies": {
     "@commitlint/cli": "19.8.1",
     "@commitlint/config-conventional": "19.8.1",
-    "@jest/globals": "30.0.1",
+    "@jest/globals": "30.0.2",
     "@tsconfig/node20": "20.1.6",
     "@types/jest": "30.0.0",
-    "@types/node": "24.0.3",
+    "@types/node": "24.0.4",
     "@types/prompts": "2.4.9",
     "@types/signale": "1.4.7",
     "@types/yargs": "17.0.33",
-    "@typescript-eslint/eslint-plugin": "8.34.1",
-    "@typescript-eslint/parser": "8.34.1",
+    "@typescript-eslint/eslint-plugin": "8.35.0",
+    "@typescript-eslint/parser": "8.35.0",
     "commitizen": "4.3.1",
     "cz-conventional-changelog": "3.3.0",
     "eslint": "9.29.0",
@@ -99,8 +99,8 @@
     "eslint-plugin-prettier": "5.5.0",
     "eslint-plugin-unused-imports": "4.1.4",
     "husky": "9.1.7",
-    "jest": "30.0.1",
-    "prettier": "3.5.3",
+    "jest": "30.0.2",
+    "prettier": "3.6.0",
     "rimraf": "6.0.1",
     "semantic-release": "24.2.5",
     "ts-jest": "29.4.0",
@@ -108,5 +108,5 @@
     "tsup": "8.5.0",
     "typescript": "5.8.3"
   },
-  "packageManager": "pnpm@10.12.1+sha512.f0dda8580f0ee9481c5c79a1d927b9164f2c478e90992ad268bbb2465a736984391d6333d2c327913578b2804af33474ca554ba29c04a8b13060a717675ae3ac"
+  "packageManager": "pnpm@10.12.3+sha512.467df2c586056165580ad6dfb54ceaad94c5a30f80893ebdec5a44c5aa73c205ae4a5bb9d5ed6bb84ea7c249ece786642bbb49d06a307df218d03da41c317417"
 }
