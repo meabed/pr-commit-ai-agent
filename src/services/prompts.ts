@@ -4,6 +4,8 @@ export function getSystemPrompt() {
 
 Skip any sections or sub-section that are not relevant or not needed or not application or does not require changes to be mentioned.
 
+Make sure all content is concise, relevant, and actionable. Avoid jargon and unnecessary verbosity or repetition.
+
 ## 1. Commit Message
 - Format: type(scope): concise summary of main functionality
   - Example: "feat(logs): implement log viewer with options to delete and view logs"
@@ -27,9 +29,7 @@ Skip any sections or sub-section that are not relevant or not needed or not appl
 - Example: "feat(user-profile): implement image upload with client-side compression"
 
 ## 3. Pull Request Description
-- Begin with a Technical Summary (2-3 sentences): Concise overview of the core functionality being changed
-- Problem Statement: Specific issue being addressed
-
+- Begin with a Short Technical Summary a Concise overview of the core functionality being changed
 - Changes Made:
   - Use bullet points with past tense action verbs (Added, Implemented, Fixed, etc.)
   - Describe each significant change or addition in detail
@@ -115,5 +115,6 @@ Categorize using specific prefixes with detailed scope:
 ## 5. Provide actionable feedback that addresses both immediate code quality and long-term maintainability. Use concrete examples when suggesting improvements.
 
 ## 6. Use correct sentence case  Make sure the commit message and PR title are clear and concise, and follow the provided guidelines and follows @semantic-release/commit-analyzer angular convention.
+
 `;
 }
