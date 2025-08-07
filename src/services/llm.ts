@@ -1,19 +1,19 @@
-import { OpenAI } from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
-import { logger } from '../logger';
-import { green, red, yellow } from 'picocolors';
-import { config } from '../config';
-import { type MessageParam } from '@anthropic-ai/sdk/resources/messages/messages';
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import * as os from 'node:os';
-import { v4 as uuidv4 } from 'uuid';
-import { getSystemPrompt } from './prompts';
+import * as path from 'node:path';
+import { createGoogleGenerativeAI, type GoogleGenerativeAIProvider } from '@ai-sdk/google';
+import Anthropic from '@anthropic-ai/sdk';
+import type { MessageParam } from '@anthropic-ai/sdk/resources/messages/messages';
+import { type GenerateObjectResult, generateObject, jsonSchema } from 'ai';
 import { tokenizeAndEstimateCost } from 'llm-cost';
-import { createGoogleGenerativeAI, GoogleGenerativeAIProvider } from '@ai-sdk/google';
-import { generateObject, GenerateObjectResult, jsonSchema } from 'ai';
-import { type ChatCompletion } from 'openai/resources/chat/completions/completions';
-import { type Response } from 'openai/resources/responses/responses';
+import { OpenAI } from 'openai';
+import type { ChatCompletion } from 'openai/resources/chat/completions/completions';
+import type { Response } from 'openai/resources/responses/responses';
+import { green, red, yellow } from 'picocolors';
+import { v4 as uuidv4 } from 'uuid';
+import { config } from '../config';
+import { logger } from '../logger';
+import { getSystemPrompt } from './prompts';
 
 // Types and Interfaces
 export type LLMProvider = 'openai' | 'anthropic' | 'deepseek' | 'ollama' | 'gemini';
@@ -190,7 +190,9 @@ async function logRequest(logEntry: LLMLogEntry): Promise<string> {
  * @returns The model name to use
  */
 function getModelForProvider(provider: LLMProvider, customModel?: string): string {
-  if (customModel) return customModel;
+  if (customModel) {
+    return customModel;
+  }
 
   switch (provider) {
     case 'openai':
@@ -547,9 +549,7 @@ async function geminiGenerate(options: CompletionOptions): Promise<{
   try {
     // Get the generative model
     const response = await generateObject({
-      model: geminiClient(model, {
-        structuredOutputs: true
-      }),
+      model: geminiClient(model),
       schema: jsonSchema({
         type: 'object'
       }),
@@ -607,7 +607,7 @@ export const generateCompletion = async (
   try {
     let response: unknown = {};
     let text = '';
-    let tokenUsage;
+    let tokenUsage: LLMCostEstimate | undefined;
 
     switch (provider) {
       case 'openai': {

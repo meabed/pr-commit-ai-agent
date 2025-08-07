@@ -4,9 +4,9 @@
  * and direct modification of settings such as LLM provider, default model, and API keys.
  */
 
-import { logger } from '../logger';
 import { blue, bold, green, red, yellow } from 'picocolors';
 import { config, configInstance, initializeConfig } from '../config';
+import { logger } from '../logger';
 
 export const command = 'config';
 export const describe = 'View and modify configuration settings';
@@ -167,24 +167,24 @@ async function configureDefaultModel(provider?: string) {
   // Suggest popular models based on the selected provider
   switch (currentProvider) {
     case 'openai':
-      suggestedModels = ['gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+      suggestedModels = ['gpt-5', 'gpt-4o', 'gpt-3.5-turbo'];
       break;
     case 'anthropic':
-      suggestedModels = ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
+      suggestedModels = ['claude-opus-4.1', 'claude-sonnet-4', 'claude-3.5-haiku'];
       break;
     case 'gemini':
-      suggestedModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'];
+      suggestedModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
       break;
     case 'ollama':
-      suggestedModels = ['llama3', 'llama2', 'mistral', 'codellama', 'qwen2.5-coder'];
+      suggestedModels = ['llama4', 'llama3.2', 'mistral', 'codellama', 'qwen3'];
       break;
     case 'deepseek':
-      suggestedModels = ['deepseek-coder', 'deepseek-chat'];
+      suggestedModels = ['deepseek-r1', 'deepseek-v3'];
       break;
   }
 
   // Allow user to select from suggested models or enter their own
-  let model;
+  let model: string;
   if (suggestedModels.length > 0) {
     const modelOptions = [...suggestedModels, 'Enter custom model name'];
     const selectedOption = await logger.prompt(yellow('[CONFIG] Select or enter model name:'), {

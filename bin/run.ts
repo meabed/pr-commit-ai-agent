@@ -1,8 +1,8 @@
-import yargs, { CommandModule, Options } from 'yargs';
+import yargs, { type CommandModule, type Options } from 'yargs';
 import 'dotenv/config';
-import { commands } from '../src';
 import { bgBlue, bold, red } from 'picocolors';
 import { hideBin } from 'yargs/helpers';
+import { commands } from '../src';
 
 const run = yargs(hideBin(process.argv));
 

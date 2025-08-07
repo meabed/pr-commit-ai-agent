@@ -1,0 +1,25 @@
+# Bun configuration file
+
+[install]
+# Use the same lockfile format
+lockfile.save = true
+
+# Auto-install peer dependencies
+peer = true
+
+# Production install by default
+production = false
+
+[install.cache]
+# Configure cache directory
+dir = "~/.bun/install/cache"
+
+[test]
+# Test configuration
+root = "."
+coverage = true
+coverageReporter = ["text", "lcov"]
+
+[run]
+# Enable source maps in stack traces
+smol = true
