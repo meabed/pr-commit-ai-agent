@@ -1,4 +1,4 @@
-pnpm lint:fix
-pnpm format:fix
-pnpm test
-pnpm build
+bun run lint:fix
+bun run format:fix
+bun run test
+bun run build

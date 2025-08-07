@@ -10,14 +10,14 @@
  * 4. Creating and pushing a PR with AI-generated content
  */
 import * as process from 'node:process';
-import { logger } from '../logger';
-import { green, red, yellow } from 'picocolors';
-import { simpleGit, SimpleGit, StatusResult } from 'simple-git';
-import { generateCompletion, LLMProvider } from '../services/llm';
-import { ArgumentsCamelCase, Argv } from 'yargs';
-import { PromptOptions } from 'consola';
-import { config } from '../config';
+import type { PromptOptions } from 'consola';
 import { execa } from 'execa';
+import { green, red, yellow } from 'picocolors';
+import { type BranchSummary, type LogResult, type SimpleGit, type StatusResult, simpleGit } from 'simple-git';
+import type { ArgumentsCamelCase, Argv } from 'yargs';
+import { config } from '../config';
+import { logger } from '../logger';
+import { generateCompletion, type LLMProvider } from '../services/llm';
 
 export const command = 'create';
 export const describe = 'Generate commit messages and create a PR using AI';
@@ -193,9 +193,11 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
     logger.info(`[CONFIG] API URL: ${baseUrl}`);
   }
 
-  const ready = await globalConfirm(`Are you ready to create an AI PR?`);
+  const ready = await globalConfirm('Are you ready to create an AI PR?');
   //
-  if (!ready) return;
+  if (!ready) {
+    return;
+  }
 
   try {
     const currentDir = process.cwd();
@@ -211,7 +213,9 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
     });
 
     const status = await performGitOperation(() => git.status(), '[GIT] Failed to get git status');
-    if (!status) return;
+    if (!status) {
+      return;
+    }
 
     logger.info(yellow('[WORKFLOW] Next step: Determine the target branch for your PR'));
     const proceedWithBranch = await globalConfirm('Would you like to proceed with determining the target branch?');
@@ -224,7 +228,9 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
       () => getUpstreamBranch(git, globalConfirm),
       '[GIT] Failed to determine upstream branch'
     );
-    if (!upstreamBranch) return;
+    if (!upstreamBranch) {
+      return;
+    }
 
     if (!status.isClean()) {
       logger.info(yellow('[WORKFLOW] Next step: Handle uncommitted changes in your working directory'));
@@ -296,7 +302,7 @@ async function getUpstreamBranch(
     logger.info(green('[BRANCH] Attempting to determine the upstream branch...'));
 
     // Try to get the tracking branch directly
-    let branchInfo;
+    let branchInfo: BranchSummary;
     try {
       branchInfo = await git.branch();
       if (!branchInfo || !branchInfo.current) {
@@ -319,14 +325,13 @@ async function getUpstreamBranch(
 
       if (confirmTracking) {
         return trackingBranch;
-      } else {
-        logger.info(yellow('[BRANCH] You chose to select a different target branch'));
       }
+      logger.info(yellow('[BRANCH] You chose to select a different target branch'));
     }
 
     // If no tracking branch or user declined, get remote branches and ask user
     logger.info(yellow('[BRANCH] Fetching available remote branches...'));
-    let remoteBranches;
+    let remoteBranches: BranchSummary;
     try {
       remoteBranches = await git.branch(['--remotes']);
       if (!remoteBranches || !remoteBranches.all) {
@@ -416,7 +421,9 @@ async function handleUncommittedChanges(
   // Build a string containing all file diffs for AI analysis
   const tempModified = [] as string[];
   for (const file of modifiedFiles) {
-    if (!file) continue;
+    if (!file) {
+      continue;
+    }
     logger.info(yellow(`[COMMIT] Analyzing changes in: ${file}`));
     try {
       const stagedDiff = await git.diff(['-U3', '--minimal', '--staged', file]);
@@ -608,7 +615,7 @@ async function optimizeCommitMessages(
 
   // Get all commits between current HEAD and upstream branch
   logger.info(yellow('[OPTIMIZE] Fetching commits information...'));
-  let commits;
+  let commits: LogResult;
   try {
     commits = await git.log({
       from: upstreamBranch,
@@ -643,7 +650,7 @@ async function optimizeCommitMessages(
   // Check if this tool created the last commit
   const isToolCommit = await isCommitCreatedByTool(git, lastCommit.hash);
   if (isToolCommit) {
-    logger.info(yellow(`[OPTIMIZE] Last commit was already created by PR Agent, skipping optimization`));
+    logger.info(yellow('[OPTIMIZE] Last commit was already created by PR Agent, skipping optimization'));
     return;
   }
 
@@ -652,7 +659,7 @@ async function optimizeCommitMessages(
   );
 
   // Check if this is a merge commit (has multiple parents)
-  let revList;
+  let revList: string;
   try {
     revList = await git.raw(['rev-list', '--parents', '-n', '1', lastCommit.hash]);
     if (!revList) {
@@ -686,7 +693,7 @@ async function optimizeCommitMessages(
 
   // Get the comprehensive diff from upstream branch to HEAD
   logger.info(yellow(`[OPTIMIZE] Getting full diff context from ${upstreamBranch} to HEAD for better analysis...`));
-  let fullDiff;
+  let fullDiff: string;
   try {
     fullDiff = await git.diff([
       '-U3',
@@ -714,7 +721,7 @@ async function optimizeCommitMessages(
 
   // Get the individual commit diff as well
   logger.info(yellow(`[OPTIMIZE] Also analyzing the specific commit: ${lastCommit.hash.substring(0, 7)}`));
-  let commitDiff;
+  let commitDiff: string;
   try {
     commitDiff = await git.show([
       '-U3',
@@ -766,7 +773,7 @@ Full branch context (all changes from upstream to HEAD):
 ${fullDiff}
 `;
 
-  logger.info(yellow(`[OPTIMIZE] Requesting commit message analysis from AI with comprehensive context...`));
+  logger.info(yellow('[OPTIMIZE] Requesting commit message analysis from AI with comprehensive context...'));
   const res = await generateCompletion(provider, {
     model,
     logRequest: globalLogRequest,
@@ -782,7 +789,7 @@ ${fullDiff}
     }
 
     if (analysis.needsImprovement) {
-      logger.info(green(`[OPTIMIZE] AI suggests improving the last commit message`));
+      logger.info(green('[OPTIMIZE] AI suggests improving the last commit message'));
       logger.info(`
 ---------------------------
 Commit message analysis:
@@ -807,13 +814,13 @@ Reason for improvement: ${analysis.reason}
           // Set the global flag to indicate a commit was optimized in this session
           commitsOptimizedInSession = true;
 
-          logger.success(green(`[OPTIMIZE] Last commit amended successfully`));
+          logger.success(green('[OPTIMIZE] Last commit amended successfully'));
         } catch (error) {
           logger.error(red(`[OPTIMIZE] Failed to amend commit: ${(error as Error).message}`));
           throw new Error('Could not amend commit message');
         }
       } else {
-        logger.info(yellow(`[OPTIMIZE] Skipping amendment for last commit`));
+        logger.info(yellow('[OPTIMIZE] Skipping amendment for last commit'));
       }
     } else {
       await markCommitAsCreatedByTool(git, lastCommit.hash);
@@ -829,7 +836,7 @@ Reason for improvement: ${analysis.reason}
   // Log the updated commit message
   try {
     const updatedCommit = await git.log(['-1']);
-    if (updatedCommit && updatedCommit.latest) {
+    if (updatedCommit?.latest) {
       logger.info(green('[OPTIMIZE] Last commit after optimization:'));
       logger.info(`${updatedCommit.latest?.hash?.substring(0, 7) ?? ''} - ${updatedCommit.latest?.message ?? ''}`);
     } else {
@@ -874,7 +881,7 @@ async function createAndPushPR(
 
   // Get the latest commit to use for branch name suggestion and PR details
   logger.info(yellow('[PR-CREATE] Fetching latest commit for PR details...'));
-  let latestCommit;
+  let latestCommit: LogResult;
   try {
     latestCommit = await git.log(['-1']);
     if (!latestCommit || !latestCommit.latest) {
@@ -889,7 +896,7 @@ async function createAndPushPR(
   const commitMessage = latestCommit.latest?.message || '';
 
   // Get current branch
-  let branchSummary;
+  let branchSummary: BranchSummary;
   try {
     branchSummary = await git.branch();
     if (!branchSummary || !branchSummary.current) {
@@ -1075,7 +1082,7 @@ Please create a comprehensive title and description that:
               prompt: updateDescriptionPrompt
             });
 
-            let updatedDescriptionData;
+            let updatedDescriptionData: { updatedTitle: string; updatedDescription: string };
             try {
               updatedDescriptionData = JSON.parse(updateRes.text);
 
@@ -1153,20 +1160,20 @@ ${updatedDescriptionData.updatedDescription.substring(0, 200)}... (truncated)
   // Generate PR details using LLM
   logger.info(yellow('[PR-CREATE] Requesting PR suggestions from AI...'));
   // get existing branch names to exclude them from suggestions
-  let existingBranches;
+  let existingBranches: BranchSummary | undefined;
   try {
     existingBranches = await git.branchLocal();
     if (!existingBranches || !Array.isArray(existingBranches.all)) {
       logger.warn(yellow('[PR-CREATE] Local branches information is undefined.'));
-      existingBranches = { all: [] };
+      existingBranches = undefined;
     }
   } catch (error) {
     logger.warn(yellow(`[PR-CREATE] Failed to get local branches: ${(error as Error).message}`));
-    existingBranches = { all: [] };
+    existingBranches = undefined;
   }
 
-  const existingBranchNames = Array.isArray(existingBranches.all)
-    ? existingBranches.all.map((branch) => branch?.trim()).join(', ')
+  const existingBranchNames = Array.isArray(existingBranches?.all)
+    ? existingBranches?.all.map((branch) => branch?.trim()).join(', ')
     : '';
 
   let fullDiff = '';
@@ -1207,7 +1214,11 @@ ${fullDiff}
     prompt: prPrompt
   });
 
-  let prData;
+  let prData: {
+    suggestedBranchName: string;
+    prTitle: string;
+    prDescription: string;
+  };
   try {
     prData = JSON.parse(res.text);
 
@@ -1265,14 +1276,12 @@ Branch name: ${prData.suggestedBranchName}
           logger.error(red(`[PR-CREATE] Failed to create and checkout branch: ${(error as Error).message}`));
           throw new Error(`Could not create branch: ${prData.suggestedBranchName}`);
         }
+      } else if (existingPR) {
+        logger.info(
+          yellow(`[PR-CREATE] Using current branch "${currentBranch}" to update existing PR #${existingPR.number}`)
+        );
       } else {
-        if (existingPR) {
-          logger.info(
-            yellow(`[PR-CREATE] Using current branch "${currentBranch}" to update existing PR #${existingPR.number}`)
-          );
-        } else {
-          logger.info(yellow(`[PR-CREATE] Using current branch "${currentBranch}" for PR`));
-        }
+        logger.info(yellow(`[PR-CREATE] Using current branch "${currentBranch}" for PR`));
       }
 
       // Push to remote
@@ -1288,7 +1297,7 @@ Branch name: ${prData.suggestedBranchName}
         return;
       }
 
-      logger.info(yellow(`[PR-CREATE] Pushing to remote repository...`));
+      logger.info(yellow('[PR-CREATE] Pushing to remote repository...'));
       try {
         if (existingPR) {
           // Simple push for existing PR
@@ -1298,7 +1307,7 @@ Branch name: ${prData.suggestedBranchName}
         } else {
           // Set upstream for new branches
           await git.push('origin', branchToPush, ['--set-upstream']);
-          logger.success(green(`[PR-CREATE] Pushed branch to remote`));
+          logger.success(green('[PR-CREATE] Pushed branch to remote'));
         }
       } catch (error) {
         logger.error(red(`[PR-CREATE] Failed to push to remote: ${(error as Error).message}`));

@@ -1,7 +1,7 @@
-import { expect } from '@jest/globals';
+import { describe, expect, test } from 'bun:test';
 
 describe('First Test Case', () => {
-  it('should pass', () => {
+  test('should pass', () => {
     expect(true).toBeTruthy();
   });
 });

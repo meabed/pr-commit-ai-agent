@@ -6,8 +6,8 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { logger } from '../logger';
 import { blue, bold, green, red, yellow } from 'picocolors';
+import { logger } from '../logger';
 import { logDir } from '../services/llm';
 
 export const command = 'logs';
@@ -22,7 +22,7 @@ export async function handler() {
     // Ensure the log directory exists
     try {
       await fs.access(logDir);
-    } catch (error) {
+    } catch (_error) {
       logger.error(red(`[LOGS-VIEWER] Log directory does not exist: ${logDir}`));
       logger.info(
         yellow('[LOGS-VIEWER] No logs have been created yet. Use --log-request flag with commands to generate logs.')
@@ -199,7 +199,9 @@ async function displayLogFile(filePath: string): Promise<void> {
               type: 'confirm'
             });
 
-            if (!continueViewing) break;
+            if (!continueViewing) {
+              break;
+            }
           }
         }
       }
