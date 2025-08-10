@@ -280,7 +280,7 @@ export async function handler(argv: ArgumentsCamelCase<CreateArgv>) {
  * Large generated files like lock files, configuration files, and binary assets are excluded
  * to ensure the AI focuses on meaningful code changes and doesn't exceed context limits.
  */
-const ignoredFiles = ['pnpm-lock.yaml', 'yarn.lock', 'package-lock.json', 'tsconfig.json'];
+const ignoredFiles = ['pnpm-lock.yaml', 'bun.lockb', 'bun.lock', 'yarn.lock', 'package-lock.json', 'tsconfig.json'];
 
 /**
  * Determines the upstream branch to use as the target for PR creation
