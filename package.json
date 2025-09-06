@@ -78,7 +78,7 @@
     "openai": "5.16.0",
     "picocolors": "1.1.1",
     "simple-git": "3.28.0",
-    "uuid": "11.1.0",
+    "uuid": "12.0.0",
     "yargs": "18.0.0"
   },
   "devDependencies": {
