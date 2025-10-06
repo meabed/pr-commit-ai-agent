@@ -83,8 +83,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.1.4",
-    "@commitlint/cli": "19.8.1",
-    "@commitlint/config-conventional": "19.8.1",
+    "@commitlint/cli": "20.1.0",
+    "@commitlint/config-conventional": "20.0.0",
     "@jest/globals": "30.2.0",
     "@tsconfig/node20": "20.1.6",
     "@types/jest": "30.0.0",
