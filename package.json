@@ -67,7 +67,7 @@
     "@ai-sdk/provider": "2.0.0",
     "@anthropic-ai/sdk": "0.70.1",
     "@types/bun": "^1.2.19",
-    "ai": "5.0.98",
+    "ai": "5.0.100",
     "conf": "^15.0.0",
     "consola": "3.4.2",
     "dotenv": "17.2.3",
