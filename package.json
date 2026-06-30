@@ -86,7 +86,7 @@
     "@commitlint/cli": "20.5.3",
     "@commitlint/config-conventional": "20.5.3",
     "@jest/globals": "30.4.1",
-    "@tsconfig/node22": "22.0.5",
+    "@tsconfig/node24": "24.0.0",
     "@types/jest": "30.0.0",
     "@types/node": "25.9.4",
     "@types/prompts": "2.4.9",
