@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.0",
-    "@ai-sdk/provider": "3.0.12",
+    "@ai-sdk/provider": "4.0.1",
     "@anthropic-ai/sdk": "0.106.0",
     "@types/bun": "^1.2.19",
     "ai": "6.0.213",
