@@ -78,7 +78,7 @@
     "openai": "6.45.0",
     "picocolors": "1.1.1",
     "simple-git": "3.36.0",
-    "uuid": "13.0.1",
+    "uuid": "13.0.2",
     "yargs": "18.0.0"
   },
   "devDependencies": {
@@ -86,7 +86,7 @@
     "@commitlint/cli": "21.1.0",
     "@commitlint/config-conventional": "21.1.0",
     "@jest/globals": "30.4.1",
-    "@tsconfig/node24": "24.0.0",
+    "@tsconfig/node24": "24.0.4",
     "@types/jest": "30.0.0",
     "@types/node": "26.0.1",
     "@types/prompts": "2.4.9",
