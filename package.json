@@ -75,7 +75,7 @@
     "giget": "3.3.0",
     "llm-cost": "^1.0.5",
     "ollama-ai-provider": "1.2.0",
-    "openai": "6.45.0",
+    "openai": "7.10.0",
     "picocolors": "1.1.1",
     "simple-git": "3.36.0",
     "uuid": "13.0.2",
