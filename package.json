@@ -100,7 +100,7 @@
     "semantic-release": "25.0.5",
     "ts-jest": "29.4.11",
     "ts-node": "10.9.2",
-    "tsup": "8.5.1",
+    "tsup": "9.0.0",
     "typescript": "5.9.3"
   },
   "packageManager": "bun"
